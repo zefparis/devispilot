@@ -12,5 +12,4 @@ docs/
 *.md
 docker-compose.yml
 node_modules/
-dist/
 DEPLOIEMENT-X3.md
