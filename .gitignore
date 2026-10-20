@@ -7,3 +7,5 @@ node_modules/
 dumps/
 server/dist/
 dist/
+.vercel
+.vercel/
