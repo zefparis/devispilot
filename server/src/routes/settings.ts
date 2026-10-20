@@ -20,7 +20,7 @@ export default async function settingsRoutes(app: FastifyInstance) {
     const signature = String(b?.signature ?? '').trim();
     const stripe = String(b?.stripe ?? '').trim();
     if (!company || company.length > 100) return reply.code(400).send({ error: 'Nom d’entreprise invalide (1 à 100 caractères).' });
-    if (!signature || signature.length > 100) return reply.code(400).send({ error: 'Signature invalide (1 à 100 caractères).' });
+    if (signature.length > 100) return reply.code(400).send({ error: 'Signature trop longue (100 caractères max).' });
     if (stripe && !validStripeLink(stripe)) return reply.code(400).send({ error: 'Lien de paiement invalide : https://buy.stripe.com/… attendu.' });
 
     const client = await pool.connect();

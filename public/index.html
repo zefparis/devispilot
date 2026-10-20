@@ -41,7 +41,7 @@
 <header class="site-header">
   <a class="brand" href="#" aria-label="DevisPilot, retour en haut">
     <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
-    devispilot<span class="beta">Pilote</span>
+    devispilot
   </a>
   <nav class="site-nav" aria-label="Navigation principale">
     <a href="#methode">La méthode</a>
@@ -123,13 +123,13 @@
 
   <section class="offer" id="offre">
     <div class="offer-copy">
-      <p class="eyebrow eyebrow-light"><i></i>Offres pilote · à valider avec vous</p>
+      <p class="eyebrow eyebrow-light"><i></i>Nos offres</p>
       <h2>Un démarrage accompagné, pas un logiciel de plus.</h2>
       <p>Nous reprenons vos devis en cours, paramétrons vos modèles de relance et installons votre rituel de suivi. Ensuite, un point mensuel pour ajuster la méthode.</p>
-      <p class="offer-note">Ces offres sont des hypothèses commerciales en cours de validation. Les fonctionnalités et limites exactes de chaque plan restent à définir avec les premiers pilotes ; aucun paiement n'est encore ouvert.</p>
+      <p class="offer-note">Les fonctionnalités et limites exactes de chaque plan restent à définir avec les premiers clients ; aucun paiement n'est encore ouvert.</p>
     </div>
-    <div class="price" aria-label="Tarifs des offres pilotes">
-      <p class="price-label">Offres pilote</p>
+    <div class="price" aria-label="Tarifs des offres">
+      <p class="price-label">Nos offres</p>
       <div class="price-plans">
         <div class="price-plan">
           <strong>Solo</strong>
@@ -165,11 +165,11 @@
       </details>
       <details>
         <summary>Les relances partent-elles automatiquement ?<svg class="icon"><use href="#i-chev"/></svg></summary>
-        <p>Non. DevisPilot prépare le message, vous l'envoyez vous-même. Ouvrir votre messagerie depuis le cockpit n'enregistre rien : seule votre confirmation manuelle déclare l'envoi. Aucune IA n'est connectée dans ce pilote ; les modèles sont fixes et relus par vous.</p>
+        <p>Non. DevisPilot prépare le message, vous l'envoyez vous-même. Ouvrir votre messagerie depuis le cockpit n'enregistre rien : seule votre confirmation manuelle déclare l'envoi. Aucune IA n'est connectée à l'application ; les modèles sont fixes et relus par vous.</p>
       </details>
       <details>
         <summary>Comment se passe le paiement de l'offre ?<svg class="icon"><use href="#i-chev"/></svg></summary>
-        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Aucun paiement n'est encore ouvert : la phase pilote permet de valider l'outil avant toute facturation.</p>
+        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Aucun paiement n'est encore ouvert : aucune facturation n'est demandée pour l'instant.</p>
       </details>
       <details>
         <summary>Puis-je importer mes devis existants ?<svg class="icon"><use href="#i-chev"/></svg></summary>
@@ -178,14 +178,14 @@
     </div>
   </section>
 
-  <p class="limits">Pilote de validation : compte sécurisé, données hébergées sur notre serveur en France, envois manuels, aucune vérification de paiement encore en place.</p>
+  <p class="limits">Compte sécurisé · données hébergées sur notre serveur en France · envois manuels · aucune facturation pour l'instant.</p>
 
   <footer class="site-footer">
     <a class="brand" href="#">
       <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
       devispilot
     </a>
-    <span>Prototype privé · nom de travail · aucun résultat commercial garanti</span>
+    <span>DevisPilot — suivi des devis pour les artisans climatisation &amp; chauffage</span>
     <button class="btn btn-quiet" data-open>Créer un compte</button>
   </footer>
 </main>
@@ -276,7 +276,6 @@
         <p class="subtle">Un email de vérification vous sera envoyé : il est nécessaire pour activer le compte.</p>
       </form>
 
-      <p class="auth-note" id="auth-note" hidden>Phase pilote : les comptes sont créés sur invitation. Demandez vos accès à l'équipe DevisPilot.</p>
       <div class="auth-alt">
         <button class="btn btn-quiet btn-sm" data-landing>← Retour au site</button>
       </div>
@@ -331,7 +330,7 @@
         <span class="nav-count" id="nav-due" hidden>0</span>
       </button>
       <button data-tab="settings" class="nav-item">
-        <svg class="icon"><use href="#i-sliders"/></svg><span>Offre &amp; réglages</span>
+        <svg class="icon"><use href="#i-sliders"/></svg><span>Paramètres</span>
       </button>
       <button data-tab="account" class="nav-item">
         <svg class="icon"><use href="#i-user"/></svg><span>Compte</span>
@@ -436,7 +435,7 @@
           <button class="btn btn-primary" id="empty-add"><svg class="icon"><use href="#i-plus"/></svg>Ajouter un devis</button>
         </div>
 
-        <p class="table-note">Les devis « signés » sont déclaratifs : aucun montant n'est présenté comme encaissé. Aucun paiement n'est connecté dans ce pilote.</p>
+        <p class="table-note">Les devis « signés » sont déclaratifs : aucun montant n'est présenté comme encaissé. Aucun paiement n'est connecté à l'application.</p>
       </div>
     </div>
 
@@ -456,15 +455,15 @@
     <div id="settings" class="tab" hidden>
       <div class="page-title">
         <div>
-          <p class="eyebrow">Pilotage de l'offre</p>
-          <h2>Réglages de l'espace pilote.</h2>
+          <p class="eyebrow">Paramètres de l'entreprise</p>
+          <h2>Réglages.</h2>
           <p class="page-sub">Identité de vos messages et lien de paiement de l'offre.</p>
         </div>
       </div>
-      <div class="settings-grid">
+      <div class="settings-grid single">
         <form id="settings-form" class="panel form-panel" novalidate>
-          <h3>Votre entreprise et votre offre</h3>
-          <p class="form-intro">Ces informations signent vos messages préparés. Le lien de paiement est celui de <em>votre</em> offre accompagnée, hébergé par Stripe.</p>
+          <h3>Votre entreprise et vos messages</h3>
+          <p class="form-intro">Ces informations signent vos messages préparés.</p>
           <div class="field">
             <label for="f-company">Nom de votre entreprise</label>
             <input id="f-company" name="company" required maxlength="100" placeholder="Ex. Atelier Confort">
@@ -472,13 +471,13 @@
           </div>
           <div class="field">
             <label for="f-signature">Signature des relances</label>
-            <input id="f-signature" name="signature" required maxlength="100" placeholder="Ex. Karim, votre artisan">
+            <input id="f-signature" name="signature" maxlength="100" placeholder="Ex. Karim Benali">
             <p class="field-error" id="err-signature" hidden></p>
           </div>
           <div class="field">
-            <label for="f-stripe">Lien Stripe Payment Link de votre offre <span class="opt">(optionnel)</span></label>
+            <label for="f-stripe">Lien Stripe Payment Link <span class="opt">(optionnel)</span></label>
             <input id="f-stripe" name="stripe" type="url" placeholder="https://buy.stripe.com/…" aria-describedby="stripe-hint err-stripe">
-            <p class="field-hint" id="stripe-hint">Lien de paiement hébergé par Stripe correspondant à vos offres pilotes (Solo 19 € HT/mois, Équipe 39 € HT/mois, installation 99 € HT). Aucune clé secrète n'est demandée ni stockée ici.</p>
+            <p class="field-hint" id="stripe-hint">Lien de paiement Stripe à joindre à vos relances (facultatif). Aucune clé secrète n'est demandée.</p>
             <p class="field-error" id="err-stripe" hidden></p>
           </div>
           <div class="form-actions">
@@ -486,24 +485,6 @@
             <a class="btn btn-quiet" href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener">Ouvrir Stripe<svg class="icon"><use href="#i-arrow"/></svg></a>
           </div>
         </form>
-
-        <div class="settings-side">
-          <div class="panel form-panel">
-            <p class="eyebrow"><i></i>Plan de validation · objectifs, pas prévisions</p>
-            <h3>Vendre avant d'automatiser.</h3>
-            <ol class="plan">
-              <li>Contacter personnellement 20 installateurs climatisation / chauffage.</li>
-              <li>Faire 5 entretiens et montrer le cockpit sur leurs cas concrets.</li>
-              <li>Obtenir 3 pilotes payants, sans promesse de gain garanti.</li>
-              <li>Mesurer le temps de suivi, les réponses et les devis signés sur 30 jours.</li>
-            </ol>
-            <div class="math">
-              <strong>20 clients Solo × 19 € = 380 €</strong>
-              <p>de revenu mensuel récurrent HT <em>théorique</em>, avant frais Stripe, hébergement, accompagnement, acquisition et impôts.</p>
-            </div>
-            <p class="subtle">Avant ouverture publique : vérification des abonnements par webhook Stripe, CGV et politique de confidentialité complètes.</p>
-          </div>
-        </div>
       </div>
     </div>
 

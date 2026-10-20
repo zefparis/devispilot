@@ -61,7 +61,7 @@ export async function buildApp() {
       const pathname = new URL(req.raw.url ?? '/', 'http://x').pathname;
       if (pathname === '/api/auth/sign-up/email') {
         if (!config.signupEnabled)
-          return reply.code(403).send({ error: 'Inscription fermée dans cette phase pilote.' });
+          return reply.code(403).send({ error: 'Les inscriptions sont fermées pour le moment.' });
         // La vérification d'email est obligatoire : sans SMTP, l'inscription
         // créerait un compte inutilisable → on la refuse explicitement.
         if (!smtpConfigured())

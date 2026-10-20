@@ -34,7 +34,7 @@ let mode = 'landing';            // 'landing' | 'live'
 let session = null;              // { user, company }
 let signupEnabled = false;
 function emptyState() {
-  return { settings: { company: '', signature: 'Votre artisan', stripe: '' }, quotes: [] };
+  return { settings: { company: '', signature: '', stripe: '' }, quotes: [] };
 }
 let state = emptyState();
 
@@ -149,7 +149,7 @@ $('#top-avatar').onclick = e => {
 };
 document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) hideMenu(); });
 
-const tabNames = { pipeline: "Vue d'ensemble", followups: 'Relances à préparer', settings: 'Offre & réglages', account: 'Compte' };
+const tabNames = { pipeline: "Vue d'ensemble", followups: 'Relances à préparer', settings: 'Paramètres', account: 'Compte' };
 function tab(id) {
   $$('.tab').forEach(el => { el.hidden = el.id !== id; });
   $$('.nav-item[data-tab], .mobile-item[data-tab], .user-menu-item[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === id));
@@ -378,7 +378,8 @@ function render() {
   const f = $('#settings-form');
   if (document.activeElement?.form !== f) {
     f.elements.company.value = state.settings.company;
-    f.elements.signature.value = state.settings.signature;
+    // Signature : valeur serveur, sinon pré-remplie avec le nom de l'utilisateur.
+    f.elements.signature.value = state.settings.signature || session?.user?.name || '';
     f.elements.stripe.value = state.settings.stripe;
   }
   $('#ws-name').textContent = state.settings.company;
@@ -572,7 +573,8 @@ function makeMessage() {
     help: 'Souhaitez-vous que nous prenions quelques minutes pour faire le point sur la proposition et vos besoins ? Vous pouvez me communiquer vos disponibilités.',
     closing: 'Votre projet est-il toujours d’actualité ? Si vous préférez que nous arrêtions le suivi, dites-le-moi simplement. Je respecterai votre choix.',
   }[$('#tone').value];
-  $('#message').value = `Bonjour,\n\nJe reviens vers vous concernant notre devis du ${fmtDate(q.sent)} pour votre projet « ${q.project} ».\n\n${middle}\n\nBien cordialement,\n${state.settings.signature}\n${state.settings.company}`;
+  const footer = [state.settings.signature || session?.user?.name || '', state.settings.company].filter(Boolean).join('\n');
+  $('#message').value = `Bonjour,\n\nJe reviens vers vous concernant notre devis du ${fmtDate(q.sent)} pour votre projet « ${q.project} ».\n\n${middle}\n\nBien cordialement,\n${footer}`;
 }
 $('#tone').onchange = makeMessage;
 
@@ -620,7 +622,7 @@ $('#settings-form').onsubmit = async e => {
   try {
     await api('/settings', { method: 'PATCH', body: { company: s.company.trim(), signature: s.signature.trim(), stripe } });
     await refresh(); render();
-    toast('Paramètres enregistrés. Aucun abonnement activé par cette action.');
+    toast('Paramètres enregistrés.');
   } catch (err) {
     setErr(f.elements.stripe, $('#err-stripe'), err.status === 400 && /stripe|lien/i.test(err.message) ? err.message : '');
     toast(err.message, 'error');
@@ -632,7 +634,7 @@ $('#settings-form').addEventListener('input', e => {
 });
 $('#buy').onclick = () => {
   if (state.settings.stripe) window.open(state.settings.stripe, '_blank', 'noopener,noreferrer');
-  else if (mode === 'live') { tab('settings'); toast('Configurez le Payment Link de votre offre dans les réglages.', 'info'); }
+  else if (mode === 'live') { tab('settings'); toast('Configurez le lien de paiement dans les paramètres.', 'info'); }
   else showAuth('login');
 };
 
@@ -920,7 +922,6 @@ $('#csv').onchange = async e => {
   } catch { signupEnabled = false; }
   $('#auth-tabs').hidden = !signupEnabled;
   $('#tab-signup').hidden = !signupEnabled;
-  $('#auth-note').hidden = signupEnabled;
 
   if (resetToken) { showAuth('reset'); return; }
 
