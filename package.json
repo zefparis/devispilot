@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Frontend statique DevisPilot — build minimal (copie public/ → dist/ + injection URL API)",
+  "description": "Frontend statique Perspecta",
   "scripts": {
     "build": "node build.mjs"
   }

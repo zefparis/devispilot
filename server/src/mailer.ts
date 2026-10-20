@@ -50,9 +50,9 @@ export async function sendMail(mail: OutgoingMail): Promise<void> {
 
 export const EMAIL_TEMPLATES = {
   verify: (url: string): string =>
-    `Bonjour,\n\nBienvenue sur DevisPilot. Confirmez votre adresse email en cliquant sur ce lien (valable 24 h) :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette inscription, ignorez ce message.\n\n— L'équipe DevisPilot`,
+    `Bonjour,\n\nBienvenue sur Perspecta. Confirmez votre adresse email en cliquant sur ce lien (valable 24 h) :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette inscription, ignorez ce message.\n\n— L'équipe Perspecta`,
   resetPassword: (url: string): string =>
-    `Bonjour,\n\nCliquez sur ce lien pour définir ou réinitialiser votre mot de passe DevisPilot (valable 1 h, usage unique) :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.\n\n— L'équipe DevisPilot`,
+    `Bonjour,\n\nCliquez sur ce lien pour définir ou réinitialiser votre mot de passe Perspecta (valable 1 h, usage unique) :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.\n\n— L'équipe Perspecta`,
   changeEmail: (url: string): string =>
-    `Bonjour,\n\nConfirmez votre nouvelle adresse email DevisPilot en cliquant sur ce lien :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n— L'équipe DevisPilot`,
+    `Bonjour,\n\nConfirmez votre nouvelle adresse email Perspecta en cliquant sur ce lien :\n\n${url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n— L'équipe Perspecta`,
 };

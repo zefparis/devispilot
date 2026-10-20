@@ -1,4 +1,4 @@
-# DevisPilot — stack dédiée. PostgreSQL reste privé (aucun port publié) ;
+# Perspecta — stack dédiée. PostgreSQL reste privé (aucun port publié) ;
 # l'API n'est exposée que sur 127.0.0.1:${API_PORT} pour cloudflared (tunnel sur l'hôte).
 services:
   db:
@@ -48,7 +48,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-DevisPilot <noreply@localhost>}
+      MAIL_FROM: ${MAIL_FROM:-Perspecta <noreply@localhost>}
       # Origine du frontend pour les liens envoyés par email.
       FRONT_URL: ${FRONT_URL:-}
       # Abonnement Stripe (Checkout + Portail + webhook signé).

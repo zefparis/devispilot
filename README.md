@@ -1,4 +1,4 @@
-# DevisPilot
+# Perspecta
 
 Prototype de suivi de devis et de relances pour petites entreprises de climatisation/chauffage.
 Frontend HTML/CSS/JavaScript buildless (sources `public/`, build minimal `npm run build` → `dist/` pour Vercel), API Node.js/TypeScript + Fastify + PostgreSQL (`server/`), déploiement Vercel (front) + Docker Compose sur X3 (API, tunnel Cloudflare).

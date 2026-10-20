@@ -57,7 +57,7 @@ export const config = {
     port: Number(process.env.SMTP_PORT ?? 587),
     user: process.env.SMTP_USER ?? '',
     pass: process.env.SMTP_PASS ?? '',
-    from: process.env.MAIL_FROM ?? 'DevisPilot <noreply@localhost>',
+    from: process.env.MAIL_FROM ?? 'Perspecta <noreply@localhost>',
   },
   // Abonnement Stripe (mode test ou live selon la clé). Sans clé, la
   // facturation est désactivée et /api/billing renvoie enabled:false.

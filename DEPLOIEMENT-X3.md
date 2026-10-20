@@ -1,4 +1,4 @@
-# Déploiement DevisPilot sur X3
+# Déploiement Perspecta sur X3
 
 Guide d'installation sur le serveur X3 (`192.168.1.166`, user `unipaycongo`).
 Rien de ce guide n'a été exécuté sur X3 : à lancer depuis x2 via SSH ou sur X3 directement.
@@ -44,7 +44,7 @@ SMTP_HOST=<serveur-smtp>
 SMTP_PORT=587
 SMTP_USER=<utilisateur-smtp>
 SMTP_PASS=<mot-de-passe-smtp>
-MAIL_FROM=DevisPilot <noreply@<domaine>>
+MAIL_FROM=Perspecta <noreply@perspecta.fr>
 
 SIGNUP_ENABLED=true                          # inscription libre une fois SMTP actif ;
                                               # l'interrupteur du back-office est
@@ -111,8 +111,8 @@ Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
 
 ## 5. Configuration Stripe (dashboard)
 
-1. **Produits** : créer 2 produits — « DevisPilot Pro » (prix mensuel + prix
-   annuel, récurrents, EUR HT) et « DevisPilot Équipe » (mensuel + annuel).
+1. **Produits** : créer 2 produits — « Perspecta Pro » (prix mensuel + prix
+   annuel, récurrents, EUR HT) et « Perspecta Équipe » (mensuel + annuel).
    Copier les 4 `price_…` dans `.env`.
 2. **Portail client** : Paramètres → Billing → Customer portal → activer
    (changement d'offre, moyen de paiement, factures, résiliation).
@@ -129,9 +129,9 @@ Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
    - *Business* : nom légal, adresse et SIREN de l'entrepreneur.
    - *Customer portal → Factures* ou *Billing* : pied de facture avec
      « TVA non applicable, art. 293 B du CGI ».
-   - *Public details* : descripteur de relevé `DEVISPILOT`, URL des CGV
-     `https://<domaine>/cgv` et politique de confidentialité
-     `https://<domaine>/confidentialite` (elles s'affichent aussi en bas de
+   - *Public details* : descripteur de relevé `PERSPECTA`, URL des CGV
+     `https://perspecta.fr/cgv` et politique de confidentialité
+     `https://perspecta.fr/confidentialite` (elles s'affichent aussi en bas de
      Checkout si renseignées dans les paramètres du compte).
    - Stripe Tax : ne pas activer (aucune TVA collectée ; `automatic_tax`
      n'est pas activé dans Checkout).
@@ -214,7 +214,7 @@ docker compose ps
 
 ## 8. Variables Stripe (préparation — rien d'actif)
 
-L'abonnement DevisPilot (artisan → nous) n'est **pas** branché : pas de clé
+L'abonnement Perspecta (artisan → nous) n'est **pas** branché : pas de clé
 secrète côté frontend, aucun droit accordé par un lien de retour.
 Quand la phase suivante l'activera : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `STRIPE_PRICE_SOLO`, `STRIPE_PRICE_TEAM` — vérification serveur + webhooks signés

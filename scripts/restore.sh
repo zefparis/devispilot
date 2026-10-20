@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restauration d'une sauvegarde DevisPilot.
+# Restauration d'une sauvegarde Perspecta.
 # Usage : ./scripts/restore.sh dumps/devispilot-XXXX.dump
 # ATTENTION : remplace intégralement les données actuelles de la base.
 set -euo pipefail

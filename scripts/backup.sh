@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sauvegarde PostgreSQL DevisPilot → dumps/devispilot-YYYYmmdd-HHMMSS.dump
+# Sauvegarde PostgreSQL Perspecta → dumps/devispilot-YYYYmmdd-HHMMSS.dump
 # Usage : ./scripts/backup.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "API DevisPilot — Fastify + PostgreSQL, sessions serveur, isolation par entreprise",
+  "description": "API Perspecta — Fastify + PostgreSQL, sessions serveur, isolation par entreprise",
   "engines": {
     "node": ">=22"
   },

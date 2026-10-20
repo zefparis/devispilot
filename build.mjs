@@ -1,4 +1,4 @@
-// Build frontend DevisPilot : copie public/ → dist/ et génère config.js
+// Build frontend Perspecta : copie public/ → dist/ et génère config.js
 // avec l'URL de l'API (VITE_API_URL ou API_URL). Sans dépendance.
 import fs from 'node:fs';
 import path from 'node:path';

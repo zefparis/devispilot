@@ -9,7 +9,7 @@ import {
 } from '../stripe.js';
 import { cgvAccepted } from '../legal.js';
 
-// Abonnement DevisPilot via Stripe. Le webhook est la source de vérité :
+// Abonnement Perspecta via Stripe. Le webhook est la source de vérité :
 // plan/statut/période sont écrits par les événements, jamais par le client.
 
 async function companyContact(companyId: string) {

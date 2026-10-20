@@ -1,7 +1,7 @@
 'use strict';
 
 /* ============================================================
-   DevisPilot — frontend
+   Perspecta — frontend
    Toutes les données passent par l'API (session cookie HttpOnly).
    Sans session valide : seules la page commerciale et les écrans
    d'authentification sont accessibles.
@@ -176,7 +176,7 @@ function showLegal(path) {
   for (const id of Object.values(LEGAL_PATHS)) $('#' + id).hidden = id !== article;
   $$('.legal-nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === path));
   if (location.pathname !== path) history.pushState(null, '', path);
-  document.title = 'DevisPilot — ' + ({ mentions: 'Mentions légales', cgv: 'CGV', confidentialite: 'Confidentialité' })[path === '/mentions-legales' ? 'mentions' : path === '/cgv' ? 'cgv' : 'confidentialite'];
+  document.title = 'Perspecta — ' + ({ mentions: 'Mentions légales', cgv: 'CGV', confidentialite: 'Confidentialité' })[path === '/mentions-legales' ? 'mentions' : path === '/cgv' ? 'cgv' : 'confidentialite'];
   return true;
 }
 // Remplit les informations légales injectées au build (jamais codées en dur).
@@ -689,7 +689,7 @@ $('#settings-form').addEventListener('input', e => {
   if (err && !err.hidden) setErr(e.target, err, '');
 });
 /* ---------- Abonnement ---------- */
-const PLAN_NAMES = { free: 'Gratuit', pro: 'Pro', team: 'Équipe' };
+const PLAN_NAMES = { free: 'Gratuit', pro: 'Perspecta Pro', team: 'Perspecta Équipe' };
 const STATUS_TXT = {
   active: 'Abonnement actif', trialing: 'Période d\'essai',
   past_due: 'Paiement en échec — Stripe retente le prélèvement',
@@ -727,7 +727,7 @@ async function loadBilling() {
     }
     html += '<div class="sub-actions">';
     if (!paid) {
-      const labels = { pro_monthly: 'Pro mensuel', pro_yearly: 'Pro annuel', team_monthly: 'Équipe mensuel', team_yearly: 'Équipe annuel' };
+      const labels = { pro_monthly: 'Perspecta Pro mensuel', pro_yearly: 'Perspecta Pro annuel', team_monthly: 'Perspecta Équipe mensuel', team_yearly: 'Perspecta Équipe annuel' };
       html += (b.prices || []).map(p =>
         `<button class="btn btn-primary btn-sm" data-subscribe="${p.id}">${labels[p.key] ?? p.key} — ${fmtPrice(p.amount_cents)}${p.interval === 'year' ? '/an' : '/mois'}</button>`).join('')
         || '<p class="form-intro">Aucune offre configurée.</p>';
@@ -938,7 +938,7 @@ $('#export-data').onclick = async () => {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `devispilot-export-${day(0)}.json`; a.click();
+    a.href = url; a.download = `perspecta-export-${day(0)}.json`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Export JSON téléchargé.');
   } catch (err) { toast(err.message, 'error'); }
@@ -1148,7 +1148,7 @@ $('#export').onclick = async () => {
     const r = await fetch(API_BASE + '/api/export.csv', { credentials: 'include' });
     if (r.status === 401) { session = null; mode = 'landing'; showAuth('login', 'Votre session a expiré.'); return; }
     if (!r.ok) throw new Error('Export impossible.');
-    download('devispilot-devis.csv', await r.text());
+    download('perspecta-devis.csv', await r.text());
     toast('Export des devis téléchargé. Historique détaillé non inclus.');
   } catch (err) { toast(err.message, 'error'); }
 };

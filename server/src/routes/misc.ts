@@ -69,7 +69,7 @@ export default async function miscRoutes(app: FastifyInstance) {
     const csv = '﻿' + [keys, ...rows.map(r => keys.map(k => (r as any)[k]))]
       .map(r => r.map(csvCell).join(';')).join('\r\n');
     reply.header('Content-Type', 'text/csv; charset=utf-8');
-    reply.header('Content-Disposition', 'attachment; filename="devispilot-devis.csv"');
+    reply.header('Content-Disposition', 'attachment; filename="perspecta-devis.csv"');
     return reply.send(csv);
   });
 }

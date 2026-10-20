@@ -13,7 +13,7 @@ process.env.RATE_LIMIT_AUTH_MAX = '1000';
 process.env.ADMIN_EMAILS = 'admin@devispilot.test';
 // Driver email de test : capture en mémoire, aucun réseau.
 process.env.SMTP_HOST = 'log';
-process.env.MAIL_FROM = 'DevisPilot Test <test@devispilot.local>';
+process.env.MAIL_FROM = 'Perspecta Test <test@devispilot.local>';
 // Stripe en mode test : clés factices, signature calculée localement.
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_testsecret';
