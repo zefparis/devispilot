@@ -24,7 +24,7 @@ export default async function miscRoutes(app: FastifyInstance) {
        WHERE m.user_id = $1 ORDER BY m.created_at LIMIT 1`, [req.userId]);
     const { rows: users } = await pool.query<{ name: string; email: string }>(
       'SELECT name, email FROM "user" WHERE id=$1', [req.userId]);
-    return { user: users[0] ?? null, company: rows[0] ?? null };
+    return { user: users[0] ?? null, company: rows[0] ?? null, session_id: req.sessionId };
   });
 
   // Création de l'entreprise à la première connexion (propriétaire = utilisateur courant).

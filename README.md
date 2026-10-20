@@ -29,15 +29,15 @@ npm run typecheck
 node --check public/app.js
 ```
 
-Mode démo : boutons « Tester la démo » — données fictives en mémoire, **aucun accès serveur**, aucune écriture dans une entreprise réelle.
-
 ## Ce qui fonctionne
 
-Inscription/connexion (inscription désactivable via `SIGNUP_ENABLED`), création d'entreprise, sessions HttpOnly, devis CRUD, file de relances, confirmation manuelle avec prochaine date (atomique + idempotent), messages déterministes modifiables, import CSV validé (anti-doublon par empreinte), export CSV (BOM, neutralisation de formules), migration explicite des devis localStorage avec aperçu/bilan, réglages signature + Payment Link validé `buy.stripe.com`.
+Comptes réels : inscription (email + mot de passe ≥ 12 caractères, `SIGNUP_ENABLED`), **vérification d'email obligatoire** (lien valable 24 h), connexion/déconnexion (erreur générique anti-énumération), **mot de passe oublié** (lien 1 h, usage unique), changement d'email avec re-vérification, changement de mot de passe, sessions listables/révocables, export RGPD en JSON, suppression de compte (confirmation par mot de passe, données liées effacées en cascade). Emails transactionnels via SMTP (`SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`, `FRONT_URL` pour les liens) — sans SMTP configuré l'inscription publique est refusée (log clair au démarrage).
+
+Métier : création d'entreprise, sessions HttpOnly, devis CRUD, file de relances, confirmation manuelle avec prochaine date (atomique + idempotent), messages déterministes modifiables, import CSV validé (anti-doublon par empreinte), export CSV (BOM, neutralisation de formules), réglages signature + Payment Link validé `buy.stripe.com`, fiche entreprise (raison sociale, SIREN/SIRET, adresse, téléphone, email de contact, logo ≤ 200 Ko). Aucune donnée fictive.
 
 ## Limites (affichées dans le produit)
 
-Aucune vérification de paiement (« Paiements non connectés »), pas d'envoi automatique (copier/mailto uniquement), pas d'IA, inscription publique fermée en production tant que l'email transactionnel n'est pas configuré, pas de « mot de passe oublié », pas d'abonnement Stripe — les tarifs affichés sont des offres pilotes dont le périmètre reste à définir.
+Aucune vérification de paiement (« Paiements non connectés »), pas d'envoi automatique de relances (copier/mailto uniquement), pas d'IA, pas d'abonnement Stripe — les tarifs affichés sont des offres pilotes dont le périmètre reste à définir.
 
 ## Commercial
 

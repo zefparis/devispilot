@@ -14,6 +14,8 @@ const baseUrl = process.env.BASE_URL ?? 'http://localhost:3400';
 // Origines frontend autorisées (déploiement séparé, ex. Vercel → api.<domaine>).
 const corsOrigins = (process.env.CORS_ORIGINS ?? '')
   .split(',').map(s => s.trim()).filter(Boolean);
+// Origine du frontend pour les liens envoyés par email (vérification, reset).
+const frontUrl = (process.env.FRONT_URL ?? corsOrigins[0] ?? baseUrl).replace(/\/$/, '');
 
 export const config = {
   isProd,
@@ -23,6 +25,7 @@ export const config = {
   databaseUrl: req('DATABASE_URL', 'postgres://devispilot:devispilot@127.0.0.1:5432/devispilot'),
   baseUrl,
   corsOrigins,
+  frontUrl,
   // SameSite=Lax par défaut : front sur <domaine>/www + API sur api.<domaine>
   // sont le MÊME site (même domaine enregistrable) → Lax suffit et n'est pas
   // bloqué comme cookie tiers par Safari/Firefox. 'none' uniquement pour les
@@ -39,4 +42,16 @@ export const config = {
   staticRoot: process.env.STATIC_ROOT ?? path.resolve(__dirname, '../../public'),
   // cloudflared (tunnel sur l'hôte) relaie X-Forwarded-* : trustProxy actif par défaut.
   trustProxy: process.env.TRUST_PROXY !== 'false',
+  // Débit /api/auth/* par IP (anti force brute). Surchargeable en test.
+  rateLimitAuth: Number(process.env.RATE_LIMIT_AUTH_MAX ?? 30),
+  // SMTP pour les emails transactionnels (vérification, reset). Sans SMTP,
+  // l'inscription publique est refusée (cf. garde dans app.ts).
+  // SMTP_HOST=log → driver de test : emails capturés en mémoire, aucun réseau.
+  smtp: {
+    host: process.env.SMTP_HOST ?? '',
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    from: process.env.MAIL_FROM ?? 'DevisPilot <noreply@localhost>',
+  },
 };

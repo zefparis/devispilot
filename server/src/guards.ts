@@ -6,6 +6,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId?: string;
     companyId?: string;
+    sessionId?: string;
   }
 }
 
@@ -26,6 +27,7 @@ export async function requireSession(req: FastifyRequest, reply: FastifyReply): 
     return;
   }
   req.userId = session.user.id;
+  req.sessionId = session.session.id;
 }
 
 // L'entreprise autorisée est déterminée côté serveur depuis la session.

@@ -3,7 +3,7 @@ import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { validateQuote, isDate } from '../validate.js';
 
-// Import explicite des devis locaux (localStorage ou CSV parsé côté client).
+// Import explicite de devis (CSV parsé côté client).
 // Idempotent : import_key unique par entreprise → une reprise ne duplique rien.
 export default async function importRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireCompany);

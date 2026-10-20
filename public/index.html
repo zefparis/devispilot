@@ -34,6 +34,7 @@
   <symbol id="i-send" viewBox="0 0 24 24"><path d="m20.5 3.5-9 9"/><path d="M20.5 3.5 14 20.5l-2.5-8-8-2.5Z"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
 </svg>
 
 <!-- ==================== PAGE COMMERCIALE ==================== -->
@@ -47,7 +48,7 @@
     <a href="#offre">L'offre</a>
     <a href="#faq">Questions</a>
     <button class="btn btn-quiet btn-sm" data-auth>Se connecter</button>
-    <button class="btn btn-dark btn-sm" data-open>Tester la démo</button>
+    <button class="btn btn-dark btn-sm" data-open>Créer un compte</button>
   </nav>
 </header>
 
@@ -58,10 +59,10 @@
       <h1>Vos devis méritent <em>une suite.</em></h1>
       <p class="lead">DevisPilot est le cockpit de suivi commercial des petites entreprises du confort thermique. Voyez quels devis attendent, préparez le bon message et gardez la trace de chaque échange.</p>
       <div class="actions">
-        <button class="btn btn-primary" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
+        <button class="btn btn-primary" data-open>Créer un compte<svg class="icon"><use href="#i-arrow"/></svg></button>
         <button class="btn btn-outline" data-auth>Se connecter</button>
       </div>
-      <p class="subtle">Démo sans inscription · données fictives · aucun envoi automatique</p>
+      <p class="subtle">Compte sécurisé · données sur notre serveur · aucun envoi automatique</p>
       <ul class="hero-tags" aria-label="Métiers concernés">
         <li>Climatisation</li>
         <li>Chauffage</li>
@@ -69,40 +70,26 @@
       </ul>
     </div>
 
-    <div class="hero-mock" role="img" aria-label="Aperçu fictif du cockpit DevisPilot : liste des relances du jour et message préparé">
-      <div class="mock-window">
-        <div class="mock-head">
-          <span class="mock-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>Cockpit — relances du jour</span>
-          <span class="mock-badge">Données fictives</span>
-        </div>
-        <div class="mock-body">
-          <div class="mock-row">
-            <span class="avatar">ML</span>
-            <div class="mock-row-main">
-              <strong>Maison Laurent</strong>
-              <small>Pompe à chaleur · 6 480 € · envoyé il y a 7 j</small>
-            </div>
-            <span class="badge badge-due"><svg class="icon"><use href="#i-clock"/></svg>À relancer</span>
-          </div>
-          <div class="mock-row">
-            <span class="avatar">RO</span>
-            <div class="mock-row-main">
-              <strong>Résidence des Oliviers</strong>
-              <small>Climatisation · 4 250 € · réponse reçue</small>
-            </div>
-            <span class="badge badge-replied"><svg class="icon"><use href="#i-msg"/></svg>Réponse reçue</span>
-          </div>
-          <div class="mock-msg">
-            <p class="mock-msg-label"><svg class="icon"><use href="#i-mail"/></svg>Message préparé — à vérifier avant envoi</p>
-            <p>« Bonjour Mme Laurent, avez-vous pu regarder notre proposition pour la pompe à chaleur ? Je reste disponible pour faire le point. »</p>
-          </div>
-          <div class="mock-foot">
-            <span class="mock-check"><svg class="icon"><use href="#i-check"/></svg>Vous validez chaque envoi</span>
-            <span class="mock-cta">Préparer la relance<svg class="icon"><use href="#i-arrow"/></svg></span>
-          </div>
-        </div>
-      </div>
+    <div class="hero-features">
+      <!-- capture réelle à ajouter -->
+      <ul class="feature-list">
+        <li>
+          <span class="feature-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
+          <div><strong>Relances du jour, au premier plan</strong><p>Chaque devis a sa prochaine échéance. Vous voyez qui rappeler dès l'ouverture.</p></div>
+        </li>
+        <li>
+          <span class="feature-icon"><svg class="icon"><use href="#i-mail"/></svg></span>
+          <div><strong>Messages préparés, relus par vous</strong><p>Des modèles sobres adaptés au stade de l'échange. Rien ne part sans votre validation.</p></div>
+        </li>
+        <li>
+          <span class="feature-icon"><svg class="icon"><use href="#i-cal"/></svg></span>
+          <div><strong>Historique et prochaine étape</strong><p>Chaque échange est tracé, la suite est planifiée. Aucun devis ne retombe dans l'oubli.</p></div>
+        </li>
+        <li>
+          <span class="feature-icon"><svg class="icon"><use href="#i-download"/></svg></span>
+          <div><strong>Vos données restent les vôtres</strong><p>Import et export CSV, export complet de votre compte, suppression à la demande.</p></div>
+        </li>
+      </ul>
     </div>
   </section>
 
@@ -156,7 +143,7 @@
         </div>
       </div>
       <p class="price-sub">Installation accompagnée facultative : <strong>99 €</strong> HT — reprise de vos devis, réglages et formation courte.</p>
-      <button class="btn btn-primary btn-block" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
+      <button class="btn btn-primary btn-block" data-open>Créer un compte<svg class="icon"><use href="#i-arrow"/></svg></button>
       <button class="btn btn-quiet btn-block" id="buy">Vérifier la disponibilité de l'offre</button>
       <small id="payment-note" class="price-note">Paiement non configuré · aucun prélèvement</small>
     </div>
@@ -165,7 +152,7 @@
   <section class="faq" id="faq">
     <div class="faq-intro">
       <p class="eyebrow"><i></i>Questions fréquentes</p>
-      <h2>Ce qu'il faut savoir avant de tester.</h2>
+      <h2>Ce qu'il faut savoir avant de commencer.</h2>
     </div>
     <div class="faq-list">
       <details>
@@ -174,7 +161,7 @@
       </details>
       <details>
         <summary>Où sont stockées mes données ?<svg class="icon"><use href="#i-chev"/></svg></summary>
-        <p>Dans ce prototype, tout reste dans le navigateur de cet appareil (localStorage). Rien n'est envoyé à un serveur, rien n'est synchronisé entre vos appareils. L'export CSV vous permet de récupérer vos devis à tout moment.</p>
+        <p>Sur un serveur dédié que nous exploitons en France, sauvegardé régulièrement. Chaque entreprise dispose d'un espace isolé : personne ne voit vos devis. Vous pouvez exporter l'intégralité de vos données (CSV ou JSON) et supprimer votre compte à tout moment depuis votre espace.</p>
       </details>
       <details>
         <summary>Les relances partent-elles automatiquement ?<svg class="icon"><use href="#i-chev"/></svg></summary>
@@ -182,7 +169,7 @@
       </details>
       <details>
         <summary>Comment se passe le paiement de l'offre ?<svg class="icon"><use href="#i-chev"/></svg></summary>
-        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Ce prototype n'encaisse rien et ne demande aucune carte : il permet seulement de valider le parcours.</p>
+        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Aucun paiement n'est encore ouvert : la phase pilote permet de valider l'outil avant toute facturation.</p>
       </details>
       <details>
         <summary>Puis-je importer mes devis existants ?<svg class="icon"><use href="#i-chev"/></svg></summary>
@@ -191,7 +178,7 @@
     </div>
   </section>
 
-  <p class="limits">Pilote de validation : données dans ce navigateur uniquement, envois manuels, aucun compte client ni vérification de paiement.</p>
+  <p class="limits">Pilote de validation : compte sécurisé, données hébergées sur notre serveur en France, envois manuels, aucune vérification de paiement encore en place.</p>
 
   <footer class="site-footer">
     <a class="brand" href="#">
@@ -199,7 +186,7 @@
       devispilot
     </a>
     <span>Prototype privé · nom de travail · aucun résultat commercial garanti</span>
-    <button class="btn btn-quiet" data-open>Explorer le cockpit</button>
+    <button class="btn btn-quiet" data-open>Créer un compte</button>
   </footer>
 </main>
 
@@ -231,7 +218,41 @@
         </div>
         <p class="field-error" id="err-login" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="login-btn">Se connecter</button>
+        <button class="btn btn-quiet btn-sm" type="button" id="forgot-link">Mot de passe oublié&nbsp;?</button>
       </form>
+
+      <form id="forgot-form" hidden novalidate>
+        <p class="auth-sub">Saisissez votre email : si un compte existe, un lien de réinitialisation vous sera envoyé (valable 1 h).</p>
+        <div class="field">
+          <label for="fp-email">Email professionnel</label>
+          <input id="fp-email" name="email" type="email" required autocomplete="email" placeholder="vous@entreprise.fr">
+        </div>
+        <p class="field-error" id="err-forgot" hidden></p>
+        <p class="field-ok" id="ok-forgot" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="forgot-btn">Recevoir le lien</button>
+        <button class="btn btn-quiet btn-sm" type="button" id="forgot-back">← Retour à la connexion</button>
+      </form>
+
+      <form id="reset-form" hidden novalidate>
+        <p class="auth-sub">Choisissez votre nouveau mot de passe (12 caractères minimum).</p>
+        <div class="field">
+          <label for="r-pass">Nouveau mot de passe</label>
+          <input id="r-pass" name="password" type="password" required minlength="12" autocomplete="new-password" placeholder="••••••••••">
+        </div>
+        <div class="field">
+          <label for="r-pass2">Confirmez le mot de passe</label>
+          <input id="r-pass2" name="password2" type="password" required minlength="12" autocomplete="new-password" placeholder="••••••••••">
+        </div>
+        <p class="field-error" id="err-reset" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="reset-btn">Enregistrer le nouveau mot de passe</button>
+      </form>
+
+      <div id="verify-note" hidden>
+        <p class="verify-icon"><svg class="icon"><use href="#i-mail"/></svg></p>
+        <p class="auth-sub"><strong>Vérifiez votre boîte mail.</strong><br>Un email de confirmation vient de partir vers <b id="verify-email-addr"></b>. Cliquez sur le lien (valable 24 h) pour activer votre compte, puis connectez-vous.</p>
+        <p class="subtle">Le lien est expiré ou l'email n'arrive pas&nbsp;? Reconnectez-vous : un nouvel email pourra être renvoyé.</p>
+        <button class="btn btn-outline btn-block" type="button" id="verify-back">Retour à la connexion</button>
+      </div>
 
       <form id="signup-form" hidden novalidate>
         <div class="field">
@@ -247,17 +268,16 @@
           <input id="s-email" name="email" type="email" required autocomplete="email" placeholder="vous@entreprise.fr">
         </div>
         <div class="field">
-          <label for="s-pass">Mot de passe <span class="opt">(10 caractères minimum)</span></label>
-          <input id="s-pass" name="password" type="password" required minlength="10" autocomplete="new-password" placeholder="••••••••••">
+          <label for="s-pass">Mot de passe <span class="opt">(12 caractères minimum)</span></label>
+          <input id="s-pass" name="password" type="password" required minlength="12" autocomplete="new-password" placeholder="••••••••••">
         </div>
         <p class="field-error" id="err-signup" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="signup-btn">Créer mon compte</button>
-        <p class="subtle">Le compte créé ouvre un espace isolé pour votre entreprise.</p>
+        <p class="subtle">Un email de vérification vous sera envoyé : il est nécessaire pour activer le compte.</p>
       </form>
 
       <p class="auth-note" id="auth-note" hidden>Phase pilote : les comptes sont créés sur invitation. Demandez vos accès à l'équipe DevisPilot.</p>
       <div class="auth-alt">
-        <button class="btn btn-quiet btn-sm" data-demo>Explorer la démo sans compte</button>
         <button class="btn btn-quiet btn-sm" data-landing>← Retour au site</button>
       </div>
     </div>
@@ -296,10 +316,10 @@
       devispilot
     </a>
     <div class="workspace">
-      <span class="avatar" id="ws-avatar">AC</span>
+      <span class="avatar" id="ws-avatar">–</span>
       <div>
-        <strong id="ws-name">Atelier Confort</strong>
-        <small>Espace pilote · local</small>
+        <strong id="ws-name">Votre entreprise</strong>
+        <small>Espace sécurisé</small>
       </div>
     </div>
     <nav class="side-nav" aria-label="Navigation du cockpit">
@@ -313,11 +333,13 @@
       <button data-tab="settings" class="nav-item">
         <svg class="icon"><use href="#i-sliders"/></svg><span>Offre &amp; réglages</span>
       </button>
+      <button data-tab="account" class="nav-item">
+        <svg class="icon"><use href="#i-user"/></svg><span>Compte</span>
+      </button>
     </nav>
     <div class="aside-bottom">
-      <p class="storage-note" id="storage-note"><svg class="icon"><use href="#i-info"/></svg>Données stockées dans ce navigateur uniquement.</p>
-      <button id="back" class="nav-item"><svg class="icon"><use href="#i-back"/></svg><span>Retour à la présentation</span></button>
-      <button id="logout" class="nav-item" hidden><svg class="icon"><use href="#i-x"/></svg><span>Se déconnecter</span></button>
+      <p class="storage-note" id="storage-note"><svg class="icon"><use href="#i-info"/></svg>Données serveur · session sécurisée.</p>
+      <button id="logout" class="nav-item"><svg class="icon"><use href="#i-x"/></svg><span>Se déconnecter</span></button>
     </div>
   </aside>
 
@@ -325,15 +347,21 @@
     <div class="app-top">
       <span class="crumb">Votre espace commercial <span aria-hidden="true">/</span> <b id="breadcrumb">Vue d'ensemble</b></span>
       <div class="app-top-right">
-        <button class="btn btn-quiet btn-sm" id="session-btn" hidden>Se déconnecter</button>
-        <span class="avatar" id="top-avatar">AC</span>
+        <div class="user-menu">
+          <button class="avatar avatar-btn" id="top-avatar" aria-label="Menu du compte" aria-haspopup="menu" aria-expanded="false">–</button>
+          <div class="user-menu-pop" id="user-menu" hidden role="menu">
+            <p class="user-menu-id" id="user-menu-email"></p>
+            <button class="user-menu-item" data-tab="account" role="menuitem"><svg class="icon"><use href="#i-user"/></svg>Mon compte</button>
+            <button class="user-menu-item" id="menu-logout" role="menuitem"><svg class="icon"><use href="#i-x"/></svg>Se déconnecter</button>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="notice" id="notice" role="status">
-      <span class="notice-label" id="data-label">Données de démonstration</span>
-      <p id="notice-text">Ce pilote sauvegarde vos modifications uniquement sur cet appareil. Aucun message n'est envoyé automatiquement.</p>
-      <button class="btn btn-quiet btn-sm" id="notice-action">Retirer les exemples</button>
+      <span class="notice-label" id="data-label">Connecté</span>
+      <p id="notice-text">Données sauvegardées côté serveur, isolées par entreprise.</p>
+      <button class="btn btn-quiet btn-sm" id="notice-action" hidden></button>
     </div>
 
     <!-- Vue d'ensemble -->
@@ -430,7 +458,7 @@
         <div>
           <p class="eyebrow">Pilotage de l'offre</p>
           <h2>Réglages de l'espace pilote.</h2>
-          <p class="page-sub">Identité de vos messages, lien de paiement de l'offre et gestion des données locales.</p>
+          <p class="page-sub">Identité de vos messages et lien de paiement de l'offre.</p>
         </div>
       </div>
       <div class="settings-grid">
@@ -473,16 +501,120 @@
               <strong>20 clients Solo × 19 € = 380 €</strong>
               <p>de revenu mensuel récurrent HT <em>théorique</em>, avant frais Stripe, hébergement, accompagnement, acquisition et impôts.</p>
             </div>
-            <p class="subtle">Avant ouverture publique : stockage serveur isolé par entreprise, authentification, vérification des abonnements par webhook Stripe, CGV, confidentialité et suppression des données.</p>
+            <p class="subtle">Avant ouverture publique : vérification des abonnements par webhook Stripe, CGV et politique de confidentialité complètes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compte / profil -->
+    <div id="account" class="tab" hidden>
+      <div class="page-title">
+        <div>
+          <p class="eyebrow">Votre compte</p>
+          <h2>Profil, entreprise et sécurité.</h2>
+          <p class="page-sub">Ces informations alimentent vos devis et sécurisent votre espace.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <div class="settings-col">
+          <form id="profile-form" class="panel form-panel" novalidate>
+            <h3>Informations personnelles</h3>
+            <div class="field">
+              <label for="p-name">Votre nom</label>
+              <input id="p-name" name="name" required maxlength="100" autocomplete="name">
+              <p class="field-error" id="err-pname" hidden></p>
+            </div>
+            <div class="field">
+              <label for="p-email">Email du compte</label>
+              <input id="p-email" name="email" type="email" disabled aria-describedby="p-email-hint">
+              <p class="field-hint" id="p-email-hint">Pour changer d'adresse, renseignez la nouvelle : un email de confirmation lui sera envoyé.</p>
+            </div>
+            <div class="field">
+              <label for="p-newemail">Nouvelle adresse email <span class="opt">(optionnel)</span></label>
+              <input id="p-newemail" name="newemail" type="email" autocomplete="off" placeholder="nouvelle@entreprise.fr">
+              <p class="field-error" id="err-pemail" hidden></p>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit" id="profile-btn">Enregistrer</button>
+            </div>
+          </form>
+
+          <form id="company-info-form" class="panel form-panel" novalidate>
+            <h3>Fiche entreprise</h3>
+            <p class="form-intro">Informations légales et de contact utilisées sur vos devis.</p>
+            <div class="field">
+              <label for="co-name">Raison sociale</label>
+              <input id="co-name" name="name" required maxlength="100">
+              <p class="field-error" id="err-coname" hidden></p>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="co-siren">SIREN / SIRET <span class="opt">(optionnel)</span></label>
+                <input id="co-siren" name="siren" inputmode="numeric" maxlength="14" placeholder="9 ou 14 chiffres">
+                <p class="field-error" id="err-siren" hidden></p>
+              </div>
+              <div class="field">
+                <label for="co-phone">Téléphone <span class="opt">(optionnel)</span></label>
+                <input id="co-phone" name="phone" type="tel" maxlength="30" autocomplete="tel">
+              </div>
+            </div>
+            <div class="field">
+              <label for="co-address">Adresse <span class="opt">(optionnel)</span></label>
+              <input id="co-address" name="address" maxlength="300" placeholder="12 rue des Lilas, 69000 Lyon">
+            </div>
+            <div class="field">
+              <label for="co-cemail">Email de contact <span class="opt">(optionnel)</span></label>
+              <input id="co-cemail" name="contact_email" type="email" maxlength="200">
+              <p class="field-error" id="err-cemail" hidden></p>
+            </div>
+            <div class="field">
+              <label for="co-logo">Logo <span class="opt">(PNG, JPEG ou WebP — 200 Ko max)</span></label>
+              <div class="logo-row">
+                <img id="logo-preview" alt="Logo de l'entreprise" hidden>
+                <input type="file" id="co-logo" accept="image/png,image/jpeg,image/webp">
+                <button type="button" class="btn btn-quiet btn-sm" id="logo-remove" hidden>Retirer le logo</button>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit" id="company-info-btn">Enregistrer la fiche</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="settings-col">
+          <form id="password-form" class="panel form-panel" novalidate>
+            <h3>Changer le mot de passe</h3>
+            <div class="field">
+              <label for="pw-current">Mot de passe actuel</label>
+              <input id="pw-current" name="current" type="password" required autocomplete="current-password">
+            </div>
+            <div class="field">
+              <label for="pw-new">Nouveau mot de passe <span class="opt">(12 caractères minimum)</span></label>
+              <input id="pw-new" name="next" type="password" required minlength="12" autocomplete="new-password">
+            </div>
+            <p class="field-error" id="err-password" hidden></p>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit" id="password-btn">Changer le mot de passe</button>
+            </div>
+          </form>
+
+          <div class="panel form-panel">
+            <h3>Sessions actives</h3>
+            <p class="form-intro">Chaque session correspond à un appareil connecté. Révoquez celle que vous ne reconnaissez pas.</p>
+            <ul class="session-list" id="session-list"><li class="subtle">Chargement…</li></ul>
+            <div class="form-actions">
+              <button class="btn btn-outline btn-sm" id="revoke-others">Déconnecter les autres appareils</button>
+            </div>
           </div>
 
           <div class="panel form-panel danger-zone">
-            <h3>Données de cet appareil</h3>
-            <p class="form-intro">Les exemples sont marqués et peuvent être retirés sans toucher à vos devis. Chaque action est confirmée avant d'être appliquée.</p>
+            <h3>Vos données</h3>
+            <p class="form-intro">Export complet de votre compte en JSON, et suppression définitive.</p>
             <div class="danger-actions">
-              <button class="btn btn-outline btn-sm" id="remove-seed"><svg class="icon"><use href="#i-trash"/></svg>Retirer les devis d'exemple</button>
-              <button class="btn btn-outline btn-sm" id="reset"><svg class="icon"><use href="#i-download"/></svg>Charger les exemples</button>
-              <button class="btn btn-danger btn-sm" id="clear"><svg class="icon"><use href="#i-alert"/></svg>Effacer toutes les données locales</button>
+              <button class="btn btn-outline btn-sm" id="export-data"><svg class="icon"><use href="#i-download"/></svg>Exporter toutes mes données (JSON)</button>
+              <button class="btn btn-danger btn-sm" id="delete-account"><svg class="icon"><use href="#i-alert"/></svg>Supprimer mon compte</button>
             </div>
           </div>
         </div>
@@ -502,8 +634,11 @@
     <button data-tab="settings" class="mobile-item">
       <svg class="icon"><use href="#i-sliders"/></svg><span>Réglages</span>
     </button>
-    <button class="mobile-item" id="back-m">
-      <svg class="icon"><use href="#i-back"/></svg><span>Sortir</span>
+    <button data-tab="account" class="mobile-item">
+      <svg class="icon"><use href="#i-user"/></svg><span>Compte</span>
+    </button>
+    <button class="mobile-item" id="logout-m">
+      <svg class="icon"><use href="#i-x"/></svg><span>Sortir</span>
     </button>
   </nav>
 </section>
@@ -612,36 +747,23 @@
   </div>
 </dialog>
 
-<dialog id="migrate" aria-labelledby="migrate-title">
+<dialog id="delete-account-dlg" aria-labelledby="delete-account-title">
   <div class="dialog-head">
     <div>
-      <p class="eyebrow"><i></i>Devis trouvés sur cet appareil</p>
-      <h2 id="migrate-title">Importer vos devis locaux&nbsp;?</h2>
+      <p class="eyebrow"><i></i>Action définitive</p>
+      <h2 id="delete-account-title">Supprimer votre compte&nbsp;?</h2>
     </div>
     <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
   </div>
-  <p class="confirm-text" id="migrate-text"></p>
-  <ul class="migrate-preview" id="migrate-preview"></ul>
-  <p class="subtle">L'import est idempotent : relancer ne crée pas de doublons. Votre copie locale n'est pas supprimée automatiquement.</p>
-  <div class="dialog-footer">
-    <button class="btn btn-quiet" id="migrate-later">Plus tard</button>
-    <button class="btn btn-quiet" id="migrate-dismiss">Ne plus proposer</button>
-    <button class="btn btn-primary" id="migrate-go">Importer</button>
+  <p class="confirm-text">Votre compte, votre entreprise, vos devis et leur historique seront définitivement supprimés. Cette action est irréversible.</p>
+  <div class="field">
+    <label for="del-password">Confirmez par votre mot de passe</label>
+    <input id="del-password" type="password" autocomplete="current-password" required>
+    <p class="field-error" id="err-delete-account" hidden></p>
   </div>
-</dialog>
-
-<dialog id="migrate-result" aria-labelledby="migrate-result-title">
-  <div class="dialog-head">
-    <div>
-      <p class="eyebrow"><i></i>Bilan de l'import</p>
-      <h2 id="migrate-result-title">Import terminé</h2>
-    </div>
-    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
-  </div>
-  <p class="confirm-text" id="migrate-result-text"></p>
   <div class="dialog-footer">
-    <button class="btn btn-danger btn-sm" id="migrate-delete-local" hidden>Supprimer la copie locale</button>
-    <button class="btn btn-primary" data-close>Fermer</button>
+    <button class="btn btn-quiet" data-close>Annuler</button>
+    <button class="btn btn-danger" id="delete-account-confirm">Supprimer définitivement</button>
   </div>
 </dialog>
 

@@ -30,12 +30,28 @@ nano .env   # valeurs à renseigner (voir ci-dessous)
 ```bash
 POSTGRES_PASSWORD=<généré : openssl rand -base64 24>
 BETTER_AUTH_SECRET=<généré : openssl rand -base64 32>
-BASE_URL=https://<hostname-du-tunnel>      # ex. https://devispilot.example.fr
+BASE_URL=https://api.<domaine>              # origine publique de l'API
 API_PORT=3400
-SIGNUP_ENABLED=false                        # tant que l'email de vérification n'est pas branché
+CORS_ORIGINS=https://<domaine>,https://www.<domaine>   # frontend Vercel (apex + www)
+FRONT_URL=https://<domaine>                 # liens des emails pointent ici
+COOKIE_SAMESITE=lax                          # <domaine>/www + api.<domaine> = même site
+COOKIE_DOMAIN=                               # vide : cookie host-only sur api.<domaine>
+TRUST_PROXY=true
+
+# Emails transactionnels — OBLIGATOIRE pour l'inscription
+# (la vérification d'email est requise : sans SMTP l'inscription est refusée 503)
+SMTP_HOST=<serveur-smtp>
+SMTP_PORT=587
+SMTP_USER=<utilisateur-smtp>
+SMTP_PASS=<mot-de-passe-smtp>
+MAIL_FROM=DevisPilot <noreply@<domaine>>
+
+SIGNUP_ENABLED=true                          # inscription libre une fois SMTP actif ;
+                                              # false = comptes sur invitation seulement
 ```
 
-`BASE_URL` en https active automatiquement les cookies `Secure`.
+`BASE_URL` en https active automatiquement les cookies `Secure`. `TRUST_PROXY=true`
+requis : le trafic arrive via cloudflared (en-têtes `X-Forwarded-*`).
 
 ```bash
 docker compose build
@@ -48,29 +64,28 @@ curl -s http://127.0.0.1:3400/api/health   # → {"ok":true}
 
 Le tunnel `x3-unipay` est géré côté dashboard (token). Ajouter une entrée :
 
-- **Public hostname** : `devispilot.<domaine>` → service `http://localhost:3400`
+- **Public hostname** : `api.<domaine>` → service `http://localhost:3400`
 
-L'API et le frontend sont servis par le même service (`/` → statique, `/api/*` → API) :
-une seule entrée suffit, sessions et CSRF simplifiés. Ne pas activer de redirection
-TLS côté Cloudflare autre que le mode habituel ; `TRUST_PROXY=false` est correct
-car cloudflared contacte directement `127.0.0.1:3400`.
+Le frontend est déployé séparément sur Vercel (`https://<domaine>` + `https://www.<domaine>`,
+build `npm run build`, output `dist`, env `VITE_API_URL=https://api.<domaine>`).
+L'API seule passe par le tunnel ; les requêtes sont cross-origin avec credentials —
+`CORS_ORIGINS` doit lister les deux origines frontend exactes.
 
-Vérifier ensuite : `curl -s https://devispilot.<domaine>/api/health`
+Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
+`curl -s https://api.<domaine>/health`.
 
 ## 3. Création des premiers comptes
 
-`SIGNUP_ENABLED=false` bloque `/api/auth/sign-up/email`. Pour créer un compte pilote :
+L'inscription publique (`SIGNUP_ENABLED=true`) exige un SMTP fonctionnel : la
+vérification d'email est obligatoire, donc une inscription sans envoi d'email
+est refusée (503) plutôt que de créer un compte bloqué.
 
-```bash
-# Option A — ouverture ponctuelle (recommandée, simple)
-docker compose stop api
-SIGNUP_ENABLED=true docker compose up -d api   # ou éditer .env puis up -d
-# → créer le compte depuis l'interface, puis remettre SIGNUP_ENABLED=false
-docker compose up -d api
-```
-
-Option B (sans rouvrir l'inscription) : insérer via `psql` dans `user` + `account`
-(hash du mot de passe attendu par Better Auth) — déconseillée, préférer A.
+- `SIGNUP_ENABLED=true` : les clients s'inscrivent seuls (email de vérification,
+  24 h ; mot de passe ≥ 12 caractères ; nom + nom d'entreprise demandés au signup,
+  entreprise créée à la première connexion).
+- `SIGNUP_ENABLED=false` : créer les comptes en ouvrant temporairement
+  (`SIGNUP_ENABLED=true docker compose up -d api`, créer le compte, repasser à
+  `false`). Le compte devra quand même cliquer le lien de vérification reçu.
 
 ## 4. Sauvegardes
 
@@ -132,16 +147,21 @@ Quand la phase suivante l'activera : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET
 idempotents. Le « lien de paiement » des réglages concerne les clients de
 l'artisan (hors périmètre).
 
-## 9. Emails transactionnels (non configurés)
+## 9. Emails transactionnels
 
-Réinitialisation de mot de passe et vérification d'email nécessitent un
-transport SMTP. Prévu dans Better Auth (`sendResetPassword` / `sendVerificationEmail`)
-— variables à prévoir : `SMTP_URL` ou équivalent, `EMAIL_FROM`. Tant que ce n'est
-pas câblé : pas de lien « mot de passe oublié » dans l'UI (volontaire).
+Vérification d'email (obligatoire, lien 24 h), mot de passe oublié (lien 1 h,
+usage unique) et changement d'email passent par le SMTP configuré
+(`SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`). Les liens pointent vers `FRONT_URL`
+(le front Vercel), pas vers l'API. Au démarrage, un warning est loggé si SMTP
+est absent ; l'inscription publique est alors refusée (503 explicite).
+`SMTP_HOST=log` = mode test : emails journalisés, aucun envoi réel.
 
 ## Limites connues
 
-- Sessions en base PostgreSQL, 14 jours, révocables (suppression de la ligne `session`).
+- Sessions en base PostgreSQL, 14 jours, révocables (liste + révocation dans
+  l'onglet Compte, ou suppression de la ligne `session`).
 - Rate-limit en mémoire (par processus) — suffisant pour un conteneur unique.
 - Un seul utilisateur/entreprise aujourd'hui ; rôles `owner`/`member` prêts pour la suite.
 - Pas de multi-instance : une API = une base.
+- Changement d'email : le lien de confirmation part vers la nouvelle adresse ;
+  l'ancienne reste l'identifiant jusqu'à validation.

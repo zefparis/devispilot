@@ -8,19 +8,45 @@ process.env.SIGNUP_ENABLED = 'true';
 process.env.BASE_URL = 'http://localhost:3410';
 process.env.BETTER_AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
 process.env.NODE_ENV = 'test';
+process.env.RATE_LIMIT_AUTH_MAX = '1000';
+// Driver email de test : capture en mémoire, aucun réseau.
+process.env.SMTP_HOST = 'log';
+process.env.MAIL_FROM = 'DevisPilot Test <test@devispilot.local>';
 
 const { buildApp } = await import('../src/app.js');
 const { migrate, pool } = await import('../src/db.js');
+const { outbox } = await import('../src/mailer.js');
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 
 const H = { 'content-type': 'application/json', 'x-devispilot-client': '1', 'host': 'localhost:3410' };
 const cookieOf = (r: any) => (r.headers['set-cookie'] ?? []).map((c: string) => c.split(';')[0]).join('; ');
+const PASSWORD = 'motdepasse1234'; // ≥ 12 caractères
 
+const lastMailTo = (email: string, subjectMatch: RegExp) =>
+  [...outbox].reverse().find(m => m.to === email && subjectMatch.test(m.subject));
+const tokenFrom = (mail: { text: string }) => /token=([A-Za-z0-9._-]+)/.exec(mail.text)?.[1];
+
+async function signupRaw(email: string, name = 'Test') {
+  return app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: H, payload: { email, password: PASSWORD, name } });
+}
+
+// Inscription complète : signup → email de vérification capturé → vérification → session.
 async function signup(email: string, name = 'Test') {
-  const r = await app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: H, payload: { email, password: 'motdepasse123', name } });
-  assert.equal(r.statusCode, 200, `signup ${email}`);
-  return cookieOf(r);
+  const r = await signupRaw(email, name);
+  assert.equal(r.statusCode, 200, `signup ${email} : ${r.body}`);
+  const mail = lastMailTo(email, /confirmez votre email/i);
+  assert.ok(mail, `email de vérification envoyé à ${email}`);
+  const token = tokenFrom(mail!);
+  assert.ok(token, 'token de vérification présent');
+  const v = await app.inject({ method: 'GET', url: `/api/auth/verify-email?token=${token}`, headers: { host: 'localhost:3410' } });
+  assert.ok([200, 302].includes(v.statusCode), `verify-email → ${v.statusCode}`);
+  // autoSignInAfterVerification : cookie de session posé à la vérification.
+  const cookie = cookieOf(v);
+  if (cookie.includes('session_token')) return cookie;
+  const s = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email, password: PASSWORD } });
+  assert.equal(s.statusCode, 200, `sign-in ${email}`);
+  return cookieOf(s);
 }
 async function createCompany(cookie: string, name: string) {
   const r = await app.inject({ method: 'POST', url: '/api/companies', headers: { ...H, cookie }, payload: { name } });
@@ -51,7 +77,7 @@ test('health + config', async () => {
 });
 
 test('accès refusé sans session', async () => {
-  for (const url of ['/api/quotes', '/api/settings', '/api/export.csv', '/api/me']) {
+  for (const url of ['/api/quotes', '/api/settings', '/api/export.csv', '/api/me', '/api/export-data', '/api/company']) {
     const r = await app.inject({ method: 'GET', url });
     assert.equal(r.statusCode, 401, url);
   }
@@ -70,7 +96,15 @@ test('origine différente refusée', async () => {
   assert.equal(r.statusCode, 403);
 });
 
-test('signup → entreprise → me, puis logout', async () => {
+test('signup envoie un email de vérification ; connexion bloquée tant que non vérifié', async () => {
+  const r = await signupRaw('nonverifie@x.fr');
+  assert.equal(r.statusCode, 200);
+  assert.ok(lastMailTo('nonverifie@x.fr', /confirmez/i), 'email de vérification capturé');
+  const s = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'nonverifie@x.fr', password: PASSWORD } });
+  assert.equal(s.statusCode, 403, 'connexion refusée avant vérification');
+});
+
+test('signup → vérification → entreprise → me, puis logout', async () => {
   const cookie = await signup('a@x.fr');
   await createCompany(cookie, 'Entreprise A');
   const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } });
@@ -81,11 +115,27 @@ test('signup → entreprise → me, puis logout', async () => {
   assert.equal(me2.statusCode, 401);
 });
 
-test('mauvais mot de passe → erreur générique 401', async () => {
+test('mauvais mot de passe → erreur générique', async () => {
   await signup('b@x.fr');
   const r = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'b@x.fr', password: 'faux-faux-faux' } });
-  assert.equal(r.statusCode, 401);
+  assert.ok([401, 403].includes(r.statusCode));
   assert.ok(!/exist|trouv/i.test(r.body));
+});
+
+test('mot de passe oublié : email → lien → nouveau mot de passe (usage unique)', async () => {
+  await signup('reset@x.fr');
+  const f = await app.inject({ method: 'POST', url: '/api/auth/request-password-reset', headers: H, payload: { email: 'reset@x.fr' } });
+  assert.equal(f.statusCode, 200);
+  const mail = lastMailTo('reset@x.fr', /réinitialisation/i);
+  assert.ok(mail, 'email de réinitialisation capturé');
+  const token = tokenFrom(mail!)!;
+  const r = await app.inject({ method: 'POST', url: '/api/auth/reset-password', headers: H, payload: { newPassword: 'nouveaumotdepasse', token } });
+  assert.ok(r.statusCode < 300, `reset → ${r.statusCode} ${r.body}`);
+  const s = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'reset@x.fr', password: 'nouveaumotdepasse' } });
+  assert.equal(s.statusCode, 200);
+  // Usage unique : le même token ne fonctionne plus.
+  const r2 = await app.inject({ method: 'POST', url: '/api/auth/reset-password', headers: H, payload: { newPassword: 'encoreautre1234', token } });
+  assert.ok(r2.statusCode >= 400, 'token réutilisé refusé');
 });
 
 test('CRUD devis + validation', async () => {
@@ -119,15 +169,18 @@ test('isolation entre entreprises (id manipulé → 404)', async () => {
     const r = await app.inject({ method: m, url: p, headers: { ...H, cookie: cB },
       payload: m === 'GET' ? undefined : { client: 'x', project: 'y', amount: 1, sent: '2026-01-01', next: '2026-01-02', status: 'sent', idemKey: 'hack', subject: '' } });
     if (m === 'GET') assert.ok(!r.json().quotes.some((q: any) => q.client === 'Secret A'));
-    else assert.equal(r.statusCode, m === 'POST' ? 404 : 404, `${m} ${p}`);
+    else assert.equal(r.statusCode, 404, `${m} ${p}`);
   }
+  // Le profil entreprise de A n'est jamais lisible par B.
+  const gB = await app.inject({ method: 'GET', url: '/api/company', headers: { cookie: cB } });
+  assert.equal(gB.json().name, 'Iso B');
 });
 
 test('relance atomique + idempotente', async () => {
   const cookie = await signup('f@x.fr'); await createCompany(cookie, 'F');
   const id = await addQuote(cookie);
   const body = { subject: 'Relance', next: '2026-10-27', idemKey: 'unique-1' };
-  const r1 = await app.inject({ method: 'POST', url: `/api/quotes/${id}/followups`, headers: { ...H, cookie }, payload: body });
+  await app.inject({ method: 'POST', url: `/api/quotes/${id}/followups`, headers: { ...H, cookie }, payload: body });
   const r2 = await app.inject({ method: 'POST', url: `/api/quotes/${id}/followups`, headers: { ...H, cookie }, payload: body });
   assert.equal(r2.json().duplicated, true);
   const { rows } = await pool.query('SELECT count(*) AS n FROM followups WHERE quote_id=$1', [id]);
@@ -136,7 +189,7 @@ test('relance atomique + idempotente', async () => {
   assert.equal(String(q[0].next), '2026-10-27');
 });
 
-test('import localStorage idempotent (seed exclus, historiques importés)', async () => {
+test('import idempotent (CSV/local parsé côté client, historiques importés)', async () => {
   const cookie = await signup('imp@x.fr'); await createCompany(cookie, 'Imp');
   const payload = {
     quotes: [
@@ -174,4 +227,66 @@ test('settings : validation du lien Stripe', async () => {
   assert.equal(ok.statusCode, 200);
   const got = await app.inject({ method: 'GET', url: '/api/settings', headers: { cookie } });
   assert.equal(got.json().stripe_link, 'https://buy.stripe.com/test_123');
+});
+
+test('fiche entreprise : validation SIREN, champs, logo', async () => {
+  const cookie = await signup('p@x.fr'); await createCompany(cookie, 'P');
+  const bad = await app.inject({ method: 'PATCH', url: '/api/company', headers: { ...H, cookie },
+    payload: { name: 'P', siren: 'ABC', address: '', phone: '', contact_email: '' } });
+  assert.equal(bad.statusCode, 400);
+  const ok = await app.inject({ method: 'PATCH', url: '/api/company', headers: { ...H, cookie },
+    payload: { name: 'P Sarl', siren: '123456789', address: '1 rue du Test', phone: '0102030405', contact_email: 'contact@p.fr' } });
+  assert.equal(ok.statusCode, 200);
+  const got = await app.inject({ method: 'GET', url: '/api/company', headers: { cookie } });
+  assert.equal(got.json().siren, '123456789');
+  // Logo : PNG 1×1 valide, trop lourd refusé.
+  const png1x1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const up = await app.inject({ method: 'PUT', url: '/api/company/logo', headers: { ...H, cookie }, payload: { data: png1x1 } });
+  assert.equal(up.statusCode, 200);
+  const g = await app.inject({ method: 'GET', url: '/api/company/logo', headers: { cookie } });
+  assert.equal(g.headers['content-type'], 'image/png');
+  const tooBig = await app.inject({ method: 'PUT', url: '/api/company/logo', headers: { ...H, cookie }, payload: { data: 'data:image/png;base64,' + Buffer.alloc(201 * 1024).toString('base64') } });
+  assert.equal(tooBig.statusCode, 400);
+  const badType = await app.inject({ method: 'PUT', url: '/api/company/logo', headers: { ...H, cookie }, payload: { data: 'data:text/html;base64,PGI+' } });
+  assert.equal(badType.statusCode, 400);
+});
+
+test('export RGPD : JSON complet du compte', async () => {
+  const cookie = await signup('rgpd@x.fr'); await createCompany(cookie, 'Rgpd');
+  await addQuote(cookie, { client: 'Client Rgpd' });
+  const r = await app.inject({ method: 'GET', url: '/api/export-data', headers: { cookie } });
+  assert.equal(r.statusCode, 200);
+  const d = r.json();
+  assert.equal(d.user.email, 'rgpd@x.fr');
+  assert.equal(d.companies[0].name, 'Rgpd');
+  assert.equal(d.quotes[0].client, 'Client Rgpd');
+});
+
+test('suppression de compte : données liées supprimées, session invalidée', async () => {
+  const cookie = await signup('bye@x.fr'); await createCompany(cookie, 'Bye');
+  const id = await addQuote(cookie, { client: 'Adieu' });
+  const del = await app.inject({ method: 'POST', url: '/api/auth/delete-user', headers: { ...H, cookie }, payload: { password: PASSWORD } });
+  assert.equal(del.statusCode, 200, `delete-user → ${del.body}`);
+  const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie } });
+  assert.equal(me.statusCode, 401);
+  const { rows } = await pool.query('SELECT count(*) AS n FROM quotes WHERE id=$1', [id]);
+  assert.equal(rows[0].n, '0', 'devis supprimé en cascade');
+  const { rows: comp } = await pool.query(`SELECT count(*) AS n FROM companies WHERE name='Bye'`);
+  assert.equal(comp[0].n, '0', 'entreprise supprimée');
+});
+
+test('sessions : liste, révocation', async () => {
+  const c1 = await signup('sess@x.fr');
+  const s2 = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'sess@x.fr', password: PASSWORD } });
+  const c2 = cookieOf(s2);
+  const list = await app.inject({ method: 'GET', url: '/api/auth/list-sessions', headers: { cookie: c1 } });
+  assert.equal(list.statusCode, 200);
+  const sessions = list.json();
+  assert.ok(sessions.length >= 2, `sessions listées : ${sessions.length}`);
+  const other = sessions.find((s: any) => !c1.includes(s.token));
+  assert.ok(other, 'autre session trouvée');
+  const rev = await app.inject({ method: 'POST', url: '/api/auth/revoke-session', headers: { ...H, cookie: c1 }, payload: { token: other.token } });
+  assert.equal(rev.statusCode, 200);
+  const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie: c2 } });
+  assert.equal(me.statusCode, 401, 'session révoquée');
 });

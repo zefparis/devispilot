@@ -2,9 +2,9 @@
 
 /* ============================================================
    DevisPilot — frontend
-   Deux modes strictement séparés :
-   - « demo » : données fictives en mémoire, rien n'est envoyé au serveur ;
-   - « live » : toutes les données passent par l'API (session cookie HttpOnly).
+   Toutes les données passent par l'API (session cookie HttpOnly).
+   Sans session valide : seules la page commerciale et les écrans
+   d'authentification sont accessibles.
    ============================================================ */
 
 // URL de base de l'API : injectée par config.js (déploiement front séparé).
@@ -13,8 +13,6 @@ const API_BASE = (window.DP_API_URL || '').replace(/\/+$/, '');
 
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const LEGACY_KEY = 'devispilot-v1';      // ancien stockage local (migration)
-const MIG_DISMISS = 'dp-mig-dismissed';
 
 const day = d => {
   const a = new Date();
@@ -24,6 +22,7 @@ const day = d => {
 const money = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtDate = s => new Date(s + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+const fmtDateTime = s => new Date(s).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s + 'T12:00:00').getTime());
 
 const labels = { sent: 'Envoyé', replied: 'Réponse reçue', won: 'Signé', lost: 'Perdu' };
@@ -31,26 +30,13 @@ const statusIcon = { sent: 'i-send', replied: 'i-msg', won: 'i-check', lost: 'i-
 const icon = (id, cls = 'icon') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 
 /* ---------- État global ---------- */
-let mode = 'landing';            // 'landing' | 'demo' | 'live'
-let session = null;              // { user, company } en mode live
+let mode = 'landing';            // 'landing' | 'live'
+let session = null;              // { user, company }
 let signupEnabled = false;
 function emptyState() {
-  return { settings: { company: 'Atelier Confort', signature: 'Votre artisan', stripe: '' }, quotes: [] };
+  return { settings: { company: '', signature: 'Votre artisan', stripe: '' }, quotes: [] };
 }
 let state = emptyState();
-
-function seedQuotes() {
-  const demo = q => ({ ...q, id: crypto.randomUUID(), email: '', history: [], seed: true });
-  return [
-    demo({ client: 'Maison Laurent', project: 'Installation pompe à chaleur', amount: 6480, sent: day(-7), next: day(-1), status: 'sent', notes: 'Exemple fictif. Valider les disponibilités pour une visite.' }),
-    demo({ client: 'Résidence des Oliviers', project: 'Climatisation réversible · 3 unités', amount: 4250, sent: day(-10), next: day(0), status: 'replied', notes: 'Exemple fictif. Une question sur le niveau sonore.' }),
-    demo({ client: 'Atelier Martin', project: 'Entretien annuel chaudière', amount: 390, sent: day(-3), next: day(4), status: 'sent', notes: 'Exemple fictif.' }),
-    demo({ client: 'Maison Vidal', project: 'Remplacement chaudière', amount: 5120, sent: day(-15), next: day(0), status: 'won', notes: 'Exemple fictif. Signature déclarée ; paiement non vérifié.' }),
-    demo({ client: 'Cabinet des Cèdres', project: 'Climatisation du cabinet', amount: 2890, sent: day(-8), next: day(2), status: 'sent', notes: 'Exemple fictif.' }),
-    demo({ client: 'Studio des Vignes', project: 'Installation monosplit', amount: 1850, sent: day(-20), next: day(0), status: 'lost', notes: 'Exemple fictif. Projet reporté.' }),
-  ];
-}
-const demoState = () => ({ settings: { company: 'Atelier Confort', signature: 'Votre artisan', stripe: '' }, quotes: seedQuotes() });
 
 /* ---------- Toast ---------- */
 let toastTimer;
@@ -105,7 +91,7 @@ async function api(path, { method = 'GET', body } = {}) {
   let data = null;
   try { data = await r.json(); } catch { /* réponse vide */ }
   if (!r.ok) {
-    const err = Object.assign(new Error(data?.error || 'Erreur serveur.'), { status: r.status });
+    const err = Object.assign(new Error(data?.error || 'Erreur serveur.'), { status: r.status, code: data?.code });
     if (r.status === 401 && mode === 'live') {
       session = null; mode = 'landing';
       showAuth('Votre session a expiré. Reconnectez-vous.');
@@ -115,7 +101,7 @@ async function api(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-/* Recharge les données serveur (live uniquement) */
+/* Recharge les données serveur */
 async function refresh() {
   const [{ quotes }, st] = await Promise.all([api('/quotes'), api('/settings')]);
   state.quotes = quotes.map(q => ({ ...q, fups: Number(q.followup_count) || 0 }));
@@ -131,59 +117,73 @@ function show(view) {
   $('#app').hidden = view !== 'app';
   window.scrollTo(0, 0);
 }
-function openDemo() {
-  mode = 'demo';
-  state = demoState();
-  show('app');
-  render();
-}
 async function enterLive() {
   try { await refresh(); } catch (e) { return toast(e.message, 'error'); }
   show('app');
   render();
-  maybeMigrate();
 }
-$$('[data-open]').forEach(b => b.onclick = () => mode === 'live' ? enterLive() : openDemo());
-$$('[data-demo]').forEach(b => b.onclick = openDemo);
-$$('[data-auth]').forEach(b => b.onclick = () => showAuth());
+// data-open = appel à l'action principal → inscription ; data-auth → connexion.
+$$('[data-open]').forEach(b => b.onclick = () => mode === 'live' ? enterLive() : showAuth('signup'));
+$$('[data-auth]').forEach(b => b.onclick = () => mode === 'live' ? enterLive() : showAuth('login'));
 $$('[data-landing]').forEach(b => b.onclick = () => show('landing'));
-$('#back').onclick = () => { if (mode === 'demo') state = emptyState(); show('landing'); };
-$('#back-m').onclick = () => { if (mode === 'demo') state = emptyState(); show('landing'); };
-$('#brand-home').onclick = e => { e.preventDefault(); $('#back').click(); };
 $('#auth-home').onclick = e => { e.preventDefault(); show('landing'); };
-$('#session-btn').onclick = async () => {
-  if (mode === 'demo') { state = emptyState(); mode = 'landing'; show('landing'); return; }
+$('#brand-home').onclick = e => { e.preventDefault(); show('landing'); };
+
+async function logout() {
   try { await api('/auth/sign-out', { method: 'POST', body: {} }); } catch { /* session déjà close */ }
   session = null; mode = 'landing'; state = emptyState();
   show('landing');
   toast('Vous êtes déconnecté.', 'info');
-};
-$('#logout').onclick = () => $('#session-btn').click();
+}
+$('#logout').onclick = logout;
+$('#logout-m').onclick = logout;
+$('#menu-logout').onclick = () => { hideMenu(); logout(); };
 
-const tabNames = { pipeline: "Vue d'ensemble", followups: 'Relances à préparer', settings: 'Offre & réglages' };
+/* Menu utilisateur (en-tête) */
+const menuPop = $('#user-menu');
+function hideMenu() { menuPop.hidden = true; $('#top-avatar').setAttribute('aria-expanded', 'false'); }
+$('#top-avatar').onclick = e => {
+  e.stopPropagation();
+  menuPop.hidden = !menuPop.hidden;
+  $('#top-avatar').setAttribute('aria-expanded', String(!menuPop.hidden));
+};
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) hideMenu(); });
+
+const tabNames = { pipeline: "Vue d'ensemble", followups: 'Relances à préparer', settings: 'Offre & réglages', account: 'Compte' };
 function tab(id) {
   $$('.tab').forEach(el => { el.hidden = el.id !== id; });
-  $$('.nav-item[data-tab], .mobile-item[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === id));
+  $$('.nav-item[data-tab], .mobile-item[data-tab], .user-menu-item[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === id));
   $('#breadcrumb').textContent = tabNames[id];
+  if (id === 'account') loadAccount();
   render();
   window.scrollTo(0, 0);
 }
 /* data-tab géré par délégation (éléments dynamiques inclus) — voir listener global. */
 
 /* ---------- Authentification ---------- */
-function showAuth(msg) {
+const authForms = ['login-form', 'signup-form', 'forgot-form', 'reset-form', 'verify-note'];
+function showAuthForm(id) {
+  authForms.forEach(f => { $('#' + f).hidden = f !== id; });
+}
+function showAuth(which = 'login', msg) {
   show('auth');
-  $('#login-form').hidden = false;
+  if (which === 'signup' && signupEnabled) $('#tab-signup').click();
+  else if (which === 'reset') showAuthForm('reset-form');
+  else if (which === 'verify') showAuthForm('verify-note');
+  else { $('#tab-login').click(); }
   if (msg) toast(msg, 'info');
 }
 $('#tab-login').onclick = () => {
   $('#tab-login').classList.add('active'); $('#tab-signup').classList.remove('active');
-  $('#login-form').hidden = false; $('#signup-form').hidden = true;
+  showAuthForm('login-form');
 };
 $('#tab-signup').onclick = () => {
   $('#tab-signup').classList.add('active'); $('#tab-login').classList.remove('active');
-  $('#signup-form').hidden = false; $('#login-form').hidden = true;
+  showAuthForm('signup-form');
 };
+$('#forgot-link').onclick = () => showAuthForm('forgot-form');
+$('#forgot-back').onclick = () => showAuthForm('login-form');
+$('#verify-back').onclick = () => showAuthForm('login-form');
 
 async function afterAuth() {
   const me = await api('/me');
@@ -197,13 +197,25 @@ $('#login-form').onsubmit = async e => {
   e.preventDefault();
   const f = e.target, unbusy = busy($('#login-btn')), err = $('#err-login');
   err.hidden = true;
+  const email = f.elements.email.value.trim();
   try {
-    await api('/auth/sign-in/email', { method: 'POST', body: { email: f.elements.email.value.trim(), password: f.elements.password.value } });
+    await api('/auth/sign-in/email', { method: 'POST', body: { email, password: f.elements.password.value } });
     f.reset();
     await afterAuth();
   } catch (err2) {
     err.hidden = false;
-    err.textContent = err2.status === 401 ? 'Email ou mot de passe incorrect.' : (err2.message || 'Connexion impossible.');
+    if (err2.status === 403 || /vérifi|verif/i.test(err2.message || '')) {
+      err.textContent = 'Email non confirmé. Cliquez sur le lien reçu par email, ou ';
+      const a = document.createElement('button');
+      a.className = 'btn btn-quiet btn-sm'; a.type = 'button'; a.textContent = 'renvoyez-le';
+      a.onclick = async () => {
+        try { await api('/auth/send-verification-email', { method: 'POST', body: { email, callbackURL: location.origin + '/?verifie=1' } }); toast('Email de confirmation renvoyé.', 'info'); }
+        catch (e3) { toast(e3.message, 'error'); }
+      };
+      err.appendChild(a);
+    } else {
+      err.textContent = err2.status === 401 ? 'Email ou mot de passe incorrect.' : (err2.message || 'Connexion impossible.');
+    }
   } finally { unbusy(); }
 };
 
@@ -216,20 +228,50 @@ $('#signup-form').onsubmit = async e => {
     email: f.elements.email.value.trim(),
     password: f.elements.password.value,
   };
-  if (payload.password.length < 10) { err.hidden = false; err.textContent = 'Mot de passe : 10 caractères minimum.'; unbusy(); return; }
+  if (payload.password.length < 12) { err.hidden = false; err.textContent = 'Mot de passe : 12 caractères minimum.'; unbusy(); return; }
   try {
     await api('/auth/sign-up/email', { method: 'POST', body: payload });
-    const me = await api('/me');
-    session = me;
-    const c = await api('/companies', { method: 'POST', body: { name: f.elements.company.value.trim() } });
-    session.company = c;
+    // L'entreprise sera créée à la première connexion (après vérification).
+    sessionStorage.setItem('dp-pending-company', f.elements.company.value.trim());
+    $('#verify-email-addr').textContent = payload.email;
     f.reset();
-    mode = 'live';
-    await enterLive();
-    toast('Espace créé. Bienvenue !');
+    showAuthForm('verify-note');
   } catch (err2) {
     err.hidden = false;
     err.textContent = err2.status === 422 ? 'Cet email est déjà utilisé.' : (err2.message || 'Inscription impossible.');
+  } finally { unbusy(); }
+};
+
+$('#forgot-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#forgot-btn')), err = $('#err-forgot'), ok = $('#ok-forgot');
+  err.hidden = ok.hidden = true;
+  try {
+    await api('/auth/request-password-reset', { method: 'POST', body: { email: f.elements.email.value.trim(), redirectTo: location.origin + '/reinitialiser' } });
+    ok.hidden = false;
+    ok.textContent = 'Si un compte correspond à cet email, un lien de réinitialisation vient de partir (valable 1 h).';
+    f.reset();
+  } catch (err2) { err.hidden = false; err.textContent = err2.message || 'Demande impossible.'; }
+  finally { unbusy(); }
+};
+
+$('#reset-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#reset-btn')), err = $('#err-reset');
+  err.hidden = true;
+  const p1 = f.elements.password.value, p2 = f.elements.password2.value;
+  if (p1.length < 12) { err.hidden = false; err.textContent = 'Mot de passe : 12 caractères minimum.'; unbusy(); return; }
+  if (p1 !== p2) { err.hidden = false; err.textContent = 'Les deux mots de passe ne correspondent pas.'; unbusy(); return; }
+  const token = new URLSearchParams(location.search).get('token') || '';
+  try {
+    await api('/auth/reset-password', { method: 'POST', body: { newPassword: p1, token } });
+    history.replaceState(null, '', '/');
+    f.reset();
+    $('#tab-login').click();
+    toast('Mot de passe mis à jour. Connectez-vous.', 'success');
+  } catch (err2) {
+    err.hidden = false;
+    err.textContent = 'Lien expiré ou déjà utilisé. Redemandez un lien de réinitialisation.';
   } finally { unbusy(); }
 };
 
@@ -240,14 +282,15 @@ $('#company-form').onsubmit = async e => {
   try {
     const c = await api('/companies', { method: 'POST', body: { name: f.elements.name.value.trim() } });
     session.company = c;
+    sessionStorage.removeItem('dp-pending-company');
     mode = 'live';
     await enterLive();
+    toast('Espace créé. Bienvenue !');
   } catch (err2) { err.hidden = false; err.textContent = err2.message; }
   finally { unbusy(); }
 };
 
 /* ---------- Rendu ---------- */
-const hasSeed = () => state.quotes.some(q => q.seed);
 const active = q => ['sent', 'replied'].includes(q.status);
 const due = () => state.quotes.filter(q => active(q) && q.next <= day(0)).sort((a, b) => a.next.localeCompare(b.next));
 
@@ -269,17 +312,6 @@ function nextInfo(q) {
 }
 const fups = q => q.fups ?? q.history?.length ?? 0;
 
-/* Devis locaux (ancien localStorage) importables — exemples exclus. */
-function localQuotes() {
-  try {
-    const x = JSON.parse(localStorage.getItem(LEGACY_KEY));
-    if (!x?.quotes) return [];
-    // Les exemples (flag seed ou note « Exemple fictif » de l'ancien format) sont exclus.
-    return x.quotes.filter(q => !q.seed && !/exemple fictif/i.test(q.notes || '')
-      && q.client && q.project && Number.isFinite(q.amount) && isDate(q.sent) && isDate(q.next) && labels[q.status]);
-  } catch { return []; }
-}
-
 function render() {
   const open = state.quotes.filter(active);
   const won = state.quotes.filter(q => q.status === 'won');
@@ -299,37 +331,9 @@ function render() {
     </article>`).join('');
 
   /* Bandeau contextuel */
-  const notice = $('#notice'), label = $('#data-label'), text = $('#notice-text'), act = $('#notice-action');
-  const localCount = mode === 'live' ? localQuotes().length : 0;
-  notice.classList.toggle('local', mode !== 'demo' && !hasSeed());
-  if (mode === 'demo') {
-    label.textContent = 'Mode démo · données fictives';
-    text.textContent = 'Exploration libre : rien n’est enregistré ni envoyé au serveur.';
-    act.textContent = 'Se connecter';
-    act.onclick = () => showAuth();
-  } else if (localCount && !localStorage.getItem(MIG_DISMISS)) {
-    label.textContent = 'Migration disponible';
-    text.textContent = `${localCount} devis conservés sur cet appareil peuvent rejoindre votre espace serveur.`;
-    act.textContent = 'Importer mes devis locaux';
-    act.onclick = () => openMigrate(localCount);
-  } else {
-    label.textContent = `Connecté · ${state.settings.company}`;
-    text.textContent = 'Données sauvegardées côté serveur, isolées par entreprise.';
-    act.hidden = true;
-    act.textContent = '';
-  }
-  if (!(mode === 'demo') && !(localCount && !localStorage.getItem(MIG_DISMISS))) act.hidden = true;
-  else act.hidden = false;
-
-  /* Éléments démo vs live */
-  $('#storage-note').innerHTML = mode === 'demo'
-    ? `${icon('i-info')}Mode démo : données fictives en mémoire, rien n'est envoyé au serveur.`
-    : `${icon('i-info')}Données serveur · session sécurisée, isolée par entreprise.`;
-  $('#logout').hidden = mode !== 'live';
-  $('#session-btn').hidden = false;
-  $('#session-btn').textContent = mode === 'demo' ? 'Quitter la démo' : 'Se déconnecter';
-  $('#remove-seed').closest('.form-panel').hidden = mode === 'live';
-  $('#reset').hidden = $('#clear').hidden = $('#remove-seed').hidden = mode === 'live';
+  $('#data-label').textContent = `Connecté · ${state.settings.company}`;
+  $('#notice-text').textContent = 'Données sauvegardées côté serveur, isolées par entreprise.';
+  $('#notice-action').hidden = true;
 
   /* Bande relances du jour + badges nav */
   const strip = $('#due-strip');
@@ -378,7 +382,9 @@ function render() {
     f.elements.stripe.value = state.settings.stripe;
   }
   $('#ws-name').textContent = state.settings.company;
-  $('#ws-avatar').textContent = $('#top-avatar').textContent = initials(state.settings.company);
+  $('#ws-avatar').textContent = initials(session?.user?.name || state.settings.company);
+  $('#top-avatar').textContent = initials(session?.user?.name || state.settings.company);
+  $('#user-menu-email').textContent = session?.user?.email || '';
   $('#buy').textContent = state.settings.stripe ? 'Accéder au paiement Stripe' : 'Vérifier la disponibilité de l\'offre';
   $('#payment-note').textContent = state.settings.stripe
     ? 'Paiement hébergé par Stripe · vérifiez le récapitulatif'
@@ -403,7 +409,7 @@ function renderRows() {
   $('#rows').innerHTML = rows.map(q => {
     const ni = nextInfo(q);
     return `<tr>
-      <td><strong>${esc(q.client)}</strong><span class="cell-sub">${esc(q.project)}${q.seed ? ' · exemple' : ''}</span></td>
+      <td><strong>${esc(q.client)}</strong><span class="cell-sub">${esc(q.project)}</span></td>
       <td class="amount"><strong>${money(q.amount)}</strong></td>
       <td>${badge(q.status)}</td>
       <td><span class="${ni.kind === 'late' ? 'due-text' : ni.kind === 'today' ? 'soon-text' : ''}">${ni.text}</span><span class="cell-sub">${ni.sub} · ${fups(q)} relance(s)</span></td>
@@ -418,7 +424,7 @@ function renderRows() {
     const ni = nextInfo(q);
     return `<article class="q-card">
       <div class="q-card-top">
-        <div><strong>${esc(q.client)}</strong><small>${esc(q.project)}${q.seed ? ' · exemple' : ''}</small></div>
+        <div><strong>${esc(q.client)}</strong><small>${esc(q.project)}</small></div>
         ${badge(q.status)}
       </div>
       <div class="q-card-meta">
@@ -461,10 +467,12 @@ document.addEventListener('click', e => {
   const compose = e.target.closest('[data-compose]');
   const close = e.target.closest('[data-close]');
   const tabBtn = e.target.closest('[data-tab]');
+  const revoke = e.target.closest('[data-revoke]');
   if (edit) editQuote(edit.dataset.edit);
   if (compose) composeQuote(compose.dataset.compose);
   if (close) close.closest('dialog')?.close();
-  if (tabBtn) tab(tabBtn.dataset.tab);
+  if (tabBtn) { hideMenu(); tab(tabBtn.dataset.tab); }
+  if (revoke) revokeSession(revoke.dataset.revoke);
 });
 
 /* ---------- Validation de champs ---------- */
@@ -518,18 +526,10 @@ $('#quote-form').onsubmit = async e => {
   o.client = o.client.trim(); o.project = o.project.trim(); o.email = o.email.trim(); o.notes = o.notes.trim();
   const old = state.quotes.find(q => q.id === o.id);
   try {
-    if (mode === 'demo') {
-      o.id = old?.id || crypto.randomUUID();
-      o.history = old?.history || [];
-      o.seed = old?.seed || false;
-      if (old) state.quotes = state.quotes.map(q => q.id === o.id ? o : q);
-      else state.quotes.unshift(o);
-    } else {
-      const body = { client: o.client, email: o.email, project: o.project, amount: o.amount, sent: o.sent, next: o.next, status: o.status, notes: o.notes };
-      if (old) await api(`/quotes/${o.id}`, { method: 'PATCH', body });
-      else await api('/quotes', { method: 'POST', body });
-      await refresh();
-    }
+    const body = { client: o.client, email: o.email, project: o.project, amount: o.amount, sent: o.sent, next: o.next, status: o.status, notes: o.notes };
+    if (old) await api(`/quotes/${o.id}`, { method: 'PATCH', body });
+    else await api('/quotes', { method: 'POST', body });
+    await refresh();
     $('#editor').close();
     render();
     toast(old ? 'Devis mis à jour.' : 'Devis enregistré.');
@@ -545,8 +545,8 @@ $('#delete').onclick = async () => {
   if (!q) return;
   if (!await askConfirm('Supprimer ce devis ?', `« ${q.client} — ${q.project} » et son historique seront définitivement supprimés.`, 'Supprimer')) return;
   try {
-    if (mode === 'demo') state.quotes = state.quotes.filter(x => x.id !== id);
-    else { await api(`/quotes/${id}`, { method: 'DELETE' }); await refresh(); }
+    await api(`/quotes/${id}`, { method: 'DELETE' });
+    await refresh();
     $('#editor').close(); render();
     toast('Devis supprimé.', 'info');
   } catch (err) { toast(err.message, 'error'); }
@@ -592,18 +592,11 @@ $('#done').onclick = async () => {
   if (!isDate(next)) return toast('Choisissez la date du prochain suivi.', 'error');
   const unbusy = busy($('#done'));
   try {
-    if (mode === 'demo') {
-      q.history = q.history || [];
-      q.history.push({ at: new Date().toISOString(), subject: $('#subject').value });
-      q.fups = q.history.length;
-      q.next = next;
-    } else {
-      await api(`/quotes/${current}/followups`, {
-        method: 'POST',
-        body: { subject: $('#subject').value, next, idemKey: composeKey },
-      });
-      await refresh();
-    }
+    await api(`/quotes/${current}/followups`, {
+      method: 'POST',
+      body: { subject: $('#subject').value, next, idemKey: composeKey },
+    });
+    await refresh();
     $('#composer').close(); render();
     toast(`Relance déclarée envoyée. Prochain suivi le ${fmtDate(next)}.`);
   } catch (err) { toast(err.message, 'error'); }
@@ -623,11 +616,6 @@ $('#settings-form').onsubmit = async e => {
   if (!f.elements.company.value.trim() || !f.elements.signature.value.trim() || !stripeOk) ok = false;
   if (!ok) return;
 
-  if (mode === 'demo') {
-    state.settings = { company: s.company.trim(), signature: s.signature.trim(), stripe };
-    render();
-    return toast('Paramètres appliqués à la démo (non persistés).', 'info');
-  }
   const unbusy = busy(f.querySelector('button[type=submit]'));
   try {
     await api('/settings', { method: 'PATCH', body: { company: s.company.trim(), signature: s.signature.trim(), stripe } });
@@ -644,79 +632,195 @@ $('#settings-form').addEventListener('input', e => {
 });
 $('#buy').onclick = () => {
   if (state.settings.stripe) window.open(state.settings.stripe, '_blank', 'noopener,noreferrer');
-  else { (mode === 'live' ? enterLive : openDemo)(); tab('settings'); toast('Configurez le Payment Link de votre offre dans les réglages.', 'info'); }
+  else if (mode === 'live') { tab('settings'); toast('Configurez le Payment Link de votre offre dans les réglages.', 'info'); }
+  else showAuth('login');
 };
 
-/* ---------- Exemples (mode démo uniquement) ---------- */
-async function removeSeed() {
-  const n = state.quotes.filter(q => q.seed).length;
-  if (!n) return toast('Aucun exemple à retirer.', 'info');
-  if (!await askConfirm('Retirer les exemples ?', `Les ${n} devis fictifs seront supprimés de la démo.`, 'Retirer les exemples')) return;
-  state.quotes = state.quotes.filter(q => !q.seed);
-  render();
-  toast('Exemples retirés.');
-}
-$('#remove-seed').onclick = removeSeed;
-
-$('#reset').onclick = () => {
-  state.quotes.push(...seedQuotes());
-  render();
-  toast('Exemples ajoutés à la démo.');
-};
-
-$('#clear').onclick = async () => {
-  if (!await askConfirm('Vider la démo ?', 'Tous les devis fictifs affichés seront retirés.', 'Tout effacer')) return;
-  state.quotes = [];
-  render();
-  toast('Démo vidée.', 'info');
-};
-
-/* ---------- Migration localStorage → serveur ---------- */
-function maybeMigrate() {
-  const items = localQuotes();
-  if (!items.length || localStorage.getItem(MIG_DISMISS)) return;
-  openMigrate(items.length);
-}
-function openMigrate(count) {
-  const items = localQuotes();
-  if (!items.length) return;
-  $('#migrate-text').textContent = `${items.length} devis personnels sont enregistrés dans ce navigateur. Ils seront copiés vers l'espace serveur de « ${session?.company?.name ?? 'votre entreprise'} » avec leurs notes et leurs relances déclarées.`;
-  $('#migrate-preview').innerHTML = items.slice(0, 6).map(q =>
-    `<li><span>${esc(q.client)} — ${esc(q.project)}</span><small>${money(q.amount)} HT</small></li>`).join('')
-    + (items.length > 6 ? `<li><span class="subtle">… et ${items.length - 6} autre(s)</span></li>` : '');
-  $('#migrate').showModal();
-}
-$('#migrate-later').onclick = () => $('#migrate').close();
-$('#migrate-dismiss').onclick = () => { localStorage.setItem(MIG_DISMISS, '1'); $('#migrate').close(); toast('Import local masqué. Retrouvez-le via « Importer CSV » ou le rechargement des données.', 'info'); };
-$('#migrate-go').onclick = async () => {
-  const items = localQuotes();
-  const unbusy = busy($('#migrate-go'));
+/* ---------- Compte : profil, entreprise, sécurité ---------- */
+let accountLoaded = false;
+async function loadAccount() {
+  if (mode !== 'live') return;
   try {
-    const payload = items.map(q => ({
-      import_key: `local-${q.id}`,
-      client: q.client, email: q.email || '', project: q.project, amount: q.amount,
-      sent: q.sent, next: q.next, status: q.status, notes: q.notes || '',
-      history: Array.isArray(q.history) ? q.history : [],
-    }));
-    const res = await api('/import', { method: 'POST', body: { quotes: payload } });
-    await refresh();
-    $('#migrate').close();
-    $('#migrate-result-text').textContent =
-      `${res.imported} devis importé(s), ${res.skipped} ignoré(s) (déjà présents)` +
-      (res.errors?.length ? `, ${res.errors.length} ligne(s) en erreur` : '') +
-      '. Votre copie locale est conservée.';
-    $('#migrate-delete-local').hidden = !(res.imported + res.skipped === items.length);
-    $('#migrate-result').showModal();
-    render();
+    const [me, company, sessions] = await Promise.all([
+      api('/me'), api('/company'), api('/auth/list-sessions'),
+    ]);
+    session = { ...session, user: me.user, session_id: me.session_id };
+    $('#p-name').value = me.user?.name || '';
+    $('#p-email').value = me.user?.email || '';
+    const cf = $('#company-info-form');
+    if (document.activeElement?.form !== cf) {
+      cf.elements.name.value = company.name || '';
+      cf.elements.siren.value = company.siren || '';
+      cf.elements.address.value = company.address || '';
+      cf.elements.phone.value = company.phone || '';
+      cf.elements.contact_email.value = company.contact_email || '';
+    }
+    renderLogo(company.has_logo);
+    renderSessions(sessions || []);
+    accountLoaded = true;
   } catch (err) { toast(err.message, 'error'); }
-  finally { unbusy(); }
+}
+
+async function renderLogo(hasLogo) {
+  const img = $('#logo-preview'), rm = $('#logo-remove');
+  if (!hasLogo) { img.hidden = rm.hidden = true; img.removeAttribute('src'); return; }
+  try {
+    const r = await fetch(API_BASE + '/api/company/logo', { credentials: 'include' });
+    if (!r.ok) throw 0;
+    img.src = URL.createObjectURL(await r.blob());
+    img.hidden = rm.hidden = false;
+  } catch { img.hidden = rm.hidden = true; }
+}
+
+function renderSessions(list) {
+  const mine = session?.session_id || '';
+  $('#session-list').innerHTML = list.length ? list.map(s => `
+    <li>
+      <div>
+        <strong>${esc((s.userAgent || 'Appareil inconnu').split(')')[0].replace(/^Mozilla\/[\d.]+ \(/, '').slice(0, 60) || 'Appareil')}</strong>
+        ${mine && s.id === mine ? ' <span class="session-here">Cette session</span>' : ''}
+        <small>Connecté le ${fmtDateTime(s.createdAt)} · expire le ${fmtDateTime(s.expiresAt)}${s.ipAddress ? ' · ' + esc(s.ipAddress) : ''}</small>
+      </div>
+      ${mine && s.id === mine ? '' : `<button class="btn btn-quiet btn-sm" data-revoke="${esc(s.token)}">Révoquer</button>`}
+    </li>`).join('') : '<li class="subtle">Aucune autre session.</li>';
+}
+
+async function revokeSession(token) {
+  if (!await askConfirm('Révoquer cette session ?', 'L\'appareil correspondant sera déconnecté immédiatement.', 'Révoquer')) return;
+  try {
+    await api('/auth/revoke-session', { method: 'POST', body: { token } });
+    renderSessions(await api('/auth/list-sessions'));
+    toast('Session révoquée.', 'info');
+  } catch (err) { toast(err.message, 'error'); }
+}
+$('#revoke-others').onclick = async () => {
+  if (!await askConfirm('Déconnecter les autres appareils ?', 'Toutes les sessions sauf celle-ci seront révoquées.', 'Tout déconnecter')) return;
+  try {
+    await api('/auth/revoke-other-sessions', { method: 'POST', body: {} });
+    renderSessions(await api('/auth/list-sessions'));
+    toast('Autres sessions révoquées.', 'info');
+  } catch (err) { toast(err.message, 'error'); }
 };
-$('#migrate-delete-local').onclick = async () => {
-  if (!await askConfirm('Supprimer la copie locale ?', 'Les devis de cet appareil seront effacés du navigateur. La copie serveur est déjà enregistrée.', 'Supprimer la copie locale')) return;
-  localStorage.removeItem(LEGACY_KEY);
-  $('#migrate-result').close();
-  render();
-  toast('Copie locale supprimée.', 'info');
+
+$('#profile-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#profile-btn')), errN = $('#err-pname'), errE = $('#err-pemail');
+  errN.hidden = errE.hidden = true;
+  const name = f.elements.name.value.trim();
+  const newEmail = f.elements.newemail.value.trim();
+  if (!name) { errN.hidden = false; errN.textContent = 'Indiquez votre nom.'; unbusy(); return; }
+  try {
+    await api('/profile', { method: 'PATCH', body: { name } });
+    if (newEmail) {
+      await api('/auth/change-email', { method: 'POST', body: { newEmail, callbackURL: location.origin + '/?verifie=1' } });
+      f.elements.newemail.value = '';
+      toast('Nom enregistré. Confirmez la nouvelle adresse via l\'email reçu.', 'info');
+    } else {
+      session.user.name = name;
+      toast('Profil enregistré.');
+    }
+    render();
+  } catch (err) {
+    const msg = err.message || 'Enregistrement impossible.';
+    if (/email/i.test(msg)) { errE.hidden = false; errE.textContent = msg; }
+    else toast(msg, 'error');
+  } finally { unbusy(); }
+};
+
+$('#company-info-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#company-info-btn')), errS = $('#err-siren'), errC = $('#err-cemail'), errN = $('#err-coname');
+  errS.hidden = errC.hidden = errN.hidden = true;
+  const siren = f.elements.siren.value.replace(/\s/g, '');
+  if (siren && !/^\d{9}$|^\d{14}$/.test(siren)) { errS.hidden = false; errS.textContent = 'SIREN ou SIRET : 9 ou 14 chiffres.'; unbusy(); return; }
+  if (!f.elements.name.value.trim()) { errN.hidden = false; errN.textContent = 'Indiquez la raison sociale.'; unbusy(); return; }
+  try {
+    await api('/company', { method: 'PATCH', body: {
+      name: f.elements.name.value.trim(), siren,
+      address: f.elements.address.value.trim(),
+      phone: f.elements.phone.value.trim(),
+      contact_email: f.elements.contact_email.value.trim(),
+    } });
+    state.settings.company = f.elements.name.value.trim();
+    render();
+    toast('Fiche entreprise enregistrée.');
+  } catch (err) {
+    const msg = err.message || 'Enregistrement impossible.';
+    if (/siren/i.test(msg)) { errS.hidden = false; errS.textContent = msg; }
+    else if (/contact/i.test(msg)) { errC.hidden = false; errC.textContent = msg; }
+    else toast(msg, 'error');
+  } finally { unbusy(); }
+};
+
+$('#co-logo').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (file.size > 200 * 1024) return toast('Logo trop lourd : 200 Ko maximum.', 'error');
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return toast('Format attendu : PNG, JPEG ou WebP.', 'error');
+  const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+  try {
+    await api('/company/logo', { method: 'PUT', body: { data } });
+    renderLogo(true);
+    toast('Logo enregistré.');
+  } catch (err) { toast(err.message, 'error'); }
+};
+$('#logo-remove').onclick = async () => {
+  try { await api('/company/logo', { method: 'DELETE' }); renderLogo(false); toast('Logo retiré.', 'info'); }
+  catch (err) { toast(err.message, 'error'); }
+};
+
+$('#password-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#password-btn')), err = $('#err-password');
+  err.hidden = true;
+  if (f.elements.next.value.length < 12) { err.hidden = false; err.textContent = 'Nouveau mot de passe : 12 caractères minimum.'; unbusy(); return; }
+  try {
+    await api('/auth/change-password', { method: 'POST', body: {
+      currentPassword: f.elements.current.value,
+      newPassword: f.elements.next.value,
+      revokeOtherSessions: true,
+    } });
+    f.reset();
+    renderSessions(await api('/auth/list-sessions'));
+    toast('Mot de passe changé. Les autres appareils ont été déconnectés.');
+  } catch (err2) {
+    err.hidden = false;
+    err.textContent = /invalid|password|credential/i.test(err2.message || '') ? 'Mot de passe actuel incorrect.' : (err2.message || 'Changement impossible.');
+  } finally { unbusy(); }
+};
+
+$('#export-data').onclick = async () => {
+  try {
+    const r = await fetch(API_BASE + '/api/export-data', { credentials: 'include' });
+    if (!r.ok) throw new Error('Export impossible.');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `devispilot-export-${day(0)}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Export JSON téléchargé.');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+$('#delete-account').onclick = () => {
+  $('#del-password').value = '';
+  $('#err-delete-account').hidden = true;
+  $('#delete-account-dlg').showModal();
+};
+$('#delete-account-confirm').onclick = async () => {
+  const err = $('#err-delete-account'), unbusy = busy($('#delete-account-confirm'));
+  err.hidden = true;
+  try {
+    await api('/auth/delete-user', { method: 'POST', body: { password: $('#del-password').value } });
+    $('#delete-account-dlg').close();
+    session = null; mode = 'landing'; state = emptyState();
+    show('landing');
+    toast('Compte supprimé. Vos données ont été effacées.', 'info');
+  } catch (err2) {
+    err.hidden = false;
+    err.textContent = 'Mot de passe incorrect, ou session trop ancienne — reconnectez-vous puis réessayez.';
+  } finally { unbusy(); }
 };
 
 /* ---------- CSV ---------- */
@@ -732,24 +836,16 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('#export').onclick = async () => {
-  if (mode === 'demo') {
-    if (!state.quotes.length) return toast('Aucun devis à exporter.', 'info');
-    const keys = ['client', 'email', 'project', 'amount', 'sent', 'status', 'next', 'notes'];
-    const csv = '\uFEFF' + [keys, ...state.quotes.map(q => keys.map(k => q[k]))].map(r => r.map(csvCell).join(';')).join('\r\n');
-    download('devispilot-devis.csv', csv);
-
-    return toast('Export des devis téléchargé. Historique détaillé non inclus.');
-  }
   try {
     const r = await fetch(API_BASE + '/api/export.csv', { credentials: 'include' });
-    if (r.status === 401) { session = null; mode = 'landing'; showAuth('Votre session a expiré.'); return; }
+    if (r.status === 401) { session = null; mode = 'landing'; showAuth('login', 'Votre session a expiré.'); return; }
     if (!r.ok) throw new Error('Export impossible.');
     download('devispilot-devis.csv', await r.text());
     toast('Export des devis téléchargé. Historique détaillé non inclus.');
   } catch (err) { toast(err.message, 'error'); }
 };
 function parseCSV(text) {
-  text = text.replace(/^\uFEFF/, '');
+  text = text.replace(/^﻿/, '');
   const first = text.split(/\r?\n/)[0], delim = first.includes(';') ? ';' : ',';
   const rows = []; let row = [], cell = '', quoted = false;
   for (let i = 0; i < text.length; i++) {
@@ -805,11 +901,6 @@ $('#csv').onchange = async e => {
     });
     if (!await askConfirm('Importer ces devis ?', `${incoming.length} devis seront ajoutés à votre portefeuille. L'import est idempotent : relancer le même fichier ne crée pas de doublons.`, 'Importer')) return;
 
-    if (mode === 'demo') {
-      incoming.forEach(q => state.quotes.unshift({ ...q, id: crypto.randomUUID(), history: [], fups: 0 }));
-      render();
-      return toast(incoming.length + ' devis importés dans la démo.');
-    }
     const res = await api('/import', { method: 'POST', body: { quotes: incoming } });
     await refresh(); render();
     toast(`${res.imported} devis importé(s), ${res.skipped} ignoré(s)` + (res.errors?.length ? `, ${res.errors.length} erreur(s)` : '') + '.');
@@ -818,6 +909,11 @@ $('#csv').onchange = async e => {
 
 /* ---------- Démarrage ---------- */
 (async function boot() {
+  // Lien de réinitialisation : /reinitialiser?token=…
+  const params = new URLSearchParams(location.search);
+  const resetToken = location.pathname === '/reinitialiser' && params.get('token');
+  const justVerified = params.get('verifie') === '1';
+
   try {
     const c = await api('/config');
     signupEnabled = !!c.signupEnabled;
@@ -825,13 +921,23 @@ $('#csv').onchange = async e => {
   $('#auth-tabs').hidden = !signupEnabled;
   $('#tab-signup').hidden = !signupEnabled;
   $('#auth-note').hidden = signupEnabled;
+
+  if (resetToken) { showAuth('reset'); return; }
+
   try {
     const me = await api('/me');
     if (me?.user) {
       session = me;
       if (me.company) { mode = 'live'; await refresh(); render(); }
-      else { show('onboard'); return; }
+      else {
+        // Nom d'entreprise saisi à l'inscription, conservé en sessionStorage.
+        const pending = sessionStorage.getItem('dp-pending-company');
+        if (pending) $('#company-form').elements.name.value = pending;
+        show('onboard');
+        return;
+      }
     }
-  } catch { /* pas de session : rester sur la page commerciale */ }
+  } catch { /* pas de session : page commerciale */ }
+  if (justVerified) { history.replaceState(null, '', '/'); showAuth('login', 'Email confirmé. Connectez-vous pour accéder à votre espace.'); }
   render();
 })();

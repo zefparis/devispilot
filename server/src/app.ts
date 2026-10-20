@@ -5,9 +5,11 @@ import cors from '@fastify/cors';
 import { config } from './config.js';
 import { auth } from './auth.js';
 import { nodeHeaders } from './guards.js';
+import { smtpConfigured, mailDriver } from './mailer.js';
 import quoteRoutes from './routes/quotes.js';
 import settingsRoutes from './routes/settings.js';
 import importRoutes from './routes/imports.js';
+import profileRoutes from './routes/profile.js';
 import miscRoutes from './routes/misc.js';
 
 export async function buildApp() {
@@ -54,11 +56,17 @@ export async function buildApp() {
   app.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: config.rateLimitAuth, timeWindow: '1 minute' } },
     handler: async (req, reply) => {
       const pathname = new URL(req.raw.url ?? '/', 'http://x').pathname;
-      if (!config.signupEnabled && pathname === '/api/auth/sign-up/email')
-        return reply.code(403).send({ error: 'Inscription fermée dans cette phase pilote.' });
+      if (pathname === '/api/auth/sign-up/email') {
+        if (!config.signupEnabled)
+          return reply.code(403).send({ error: 'Inscription fermée dans cette phase pilote.' });
+        // La vérification d'email est obligatoire : sans SMTP, l'inscription
+        // créerait un compte inutilisable → on la refuse explicitement.
+        if (!smtpConfigured())
+          return reply.code(503).send({ error: 'Inscription indisponible : envoi d’emails non configuré (SMTP).' });
+      }
       const url = new URL(req.raw.url ?? '/', `${req.protocol}://${req.headers.host}`);
       const headers = nodeHeaders(req);
       const init: RequestInit & { duplex?: 'half' } = { method: req.method, headers };
@@ -76,9 +84,15 @@ export async function buildApp() {
     },
   });
 
+  if (!smtpConfigured())
+    app.log.warn('SMTP non configuré (SMTP_HOST) : aucun email transactionnel ne pourra être envoyé. L\'inscription publique sera refusée tant que SMTP n\'est pas défini.');
+  else if (mailDriver() === 'log')
+    app.log.warn('SMTP_HOST=log : les emails sont journalisés, aucun envoi réel (mode test).');
+
   await app.register(miscRoutes);
   await app.register(quoteRoutes);
   await app.register(settingsRoutes);
+  await app.register(profileRoutes);
   await app.register(importRoutes);
 
   // Frontend statique (même origine que /api) + repli mono-page.

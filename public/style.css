@@ -188,56 +188,66 @@ h3 { font-size: 16px; font-weight: 650; }
   padding: 7px 13px; border-radius: 999px; background: var(--card);
 }
 
-/* --- Maquette cockpit --- */
-.hero-mock { position: relative; }
-.mock-window {
+/* --- Bloc fonctionnalités du hero --- */
+.hero-features {
   background: var(--card); border: 1px solid var(--line);
-  border-radius: 18px; box-shadow: var(--shadow); overflow: hidden;
+  border-radius: 18px; box-shadow: var(--shadow); padding: 26px 26px;
 }
-.mock-head {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 18px; border-bottom: 1px solid var(--line);
-  font-size: 12px; color: var(--muted); font-weight: 550;
-}
-.mock-dots { display: inline-flex; gap: 5px; }
-.mock-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
-.mock-badge {
-  margin-left: auto; font-size: 10px; font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase;
+.feature-list { list-style: none; display: grid; gap: 20px; }
+.feature-list li { display: flex; gap: 14px; align-items: flex-start; }
+.feature-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
   background: var(--green-soft); color: var(--green);
-  padding: 4px 9px; border-radius: 5px;
 }
-.mock-body { padding: 22px; display: grid; gap: 14px; }
-.mock-row {
-  display: flex; align-items: center; gap: 12px;
-  border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
-}
-.mock-row-main { min-width: 0; }
-.mock-row-main strong { display: block; font-size: 14px; }
-.mock-row-main small { display: block; font-size: 12px; color: var(--muted); }
-.mock-row .badge { margin-left: auto; }
+.feature-icon .icon { width: 19px; height: 19px; }
+.feature-list strong { display: block; font-size: 14px; }
+.feature-list p { font-size: 13px; color: var(--muted); line-height: 1.55; margin-top: 3px; }
 
-.mock-msg {
-  background: var(--paper); border-radius: 12px; padding: 16px 18px;
-  font-size: 13px; line-height: 1.7; color: #44504a;
+/* --- Menu utilisateur --- */
+.user-menu { position: relative; }
+.avatar-btn { border: none; cursor: pointer; }
+.user-menu-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40;
+  min-width: 210px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 6px;
 }
-.mock-msg-label {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 11px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--green); margin-bottom: 8px;
+.user-menu-id {
+  font-size: 12px; color: var(--muted); padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line); margin-bottom: 5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.mock-msg-label .icon { width: 14px; height: 14px; }
-.mock-foot {
+.user-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 9px 10px; border: none; background: none; border-radius: 8px;
+  font-size: 13px; font-weight: 550; color: var(--ink); cursor: pointer;
+  font-family: inherit; text-align: left;
+}
+.user-menu-item:hover { background: var(--paper); }
+.user-menu-item .icon { width: 15px; height: 15px; color: var(--muted); }
+
+/* --- Compte : sessions, logo --- */
+.settings-col { display: grid; gap: 20px; align-content: start; }
+.session-list { list-style: none; display: grid; gap: 10px; }
+.session-list li {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  font-size: 12px; color: var(--muted); flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  font-size: 13px;
 }
-.mock-check { display: inline-flex; align-items: center; gap: 7px; }
-.mock-check .icon { width: 15px; height: 15px; color: var(--green); }
-.mock-cta {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-weight: 650; color: var(--green); font-size: 13px;
+.session-list .session-here {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--green-soft); color: var(--green);
+  padding: 3px 8px; border-radius: 5px; flex-shrink: 0;
 }
-.mock-cta .icon { width: 15px; height: 15px; }
+.session-list small { display: block; color: var(--muted); font-size: 12px; }
+.logo-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.logo-row img {
+  width: 56px; height: 56px; object-fit: contain;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
+}
+.field-ok { font-size: 13px; color: var(--green); font-weight: 550; }
+.verify-icon .icon { width: 30px; height: 30px; color: var(--green); }
+.verify-icon { margin-bottom: 10px; }
 
 /* ---------- Badges de statut ---------- */
 .badge {
