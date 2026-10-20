@@ -1,10 +1,539 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DevisPilot, le cockpit commercial des artisans climatisation et chauffage. Suivez vos devis et préparez vos relances."><title>DevisPilot · Chaque devis mérite une suite</title><link rel="stylesheet" href="style.css"></head><body>
-<header><a class="brand" href="#"><span class="logo">d↗</span>devispilot<span class="beta">PILOTE</span></a><nav><a href="#methode">La méthode</a><a href="#offre">L'offre</a><button class="small dark" data-open>Ouvrir le cockpit ↗</button></nav></header>
-<main id="landing"><section class="hero"><div class="hero-copy"><p class="eyebrow"><i></i> POUR LES ARTISANS DU CONFORT THERMIQUE</p><h1>Vos journées sont pleines.<br>Vos devis méritent<br><em>une suite.</em></h1><p class="lead">Le cockpit qui remet vos opportunités au bon endroit. Repérez les devis à suivre, préparez une relance et gardez la main sur votre relation client.</p><div class="actions"><button class="primary" data-open>Tester le cockpit <span>↗</span></button><a class="text-link" href="#offre">Voir l'offre pilote ↓</a></div><p class="subtle">Démo sans inscription · Aucune carte demandée</p><div class="hero-bottom"><span>CLIMATISATION</span><span>CHAUFFAGE</span><span>POMPES À CHALEUR</span></div></div><div class="hero-art"><div class="orbit o1"></div><div class="orbit o2"></div><div class="mini-label">MOINS D'OUBLIS. PLUS DE SUIVI.</div><div class="preview"><div class="preview-top"><span class="dots">● ● ●</span><span>Votre prochain geste commercial</span><span>↗</span></div><div class="preview-body"><p class="eyebrow">EXEMPLE ILLUSTRATIF</p><div class="big-num">6 480 <small>€</small></div><p>de devis à suivre cette semaine</p><div class="preview-line"><span class="avatar">ML</span><div><strong>Maison Laurent</strong><small>Pompe à chaleur · Devis envoyé il y a 7 j</small></div><b class="tag">À relancer</b></div><div class="message">« Bonjour Mme Laurent, avez-vous pu regarder notre proposition ? Je reste disponible pour faire le point. »</div><div class="preview-foot"><span><i></i> Vous validez chaque message</span><b>Préparer la relance ↗</b></div></div></div><div class="floating"><span>↗</span><div><strong>Le bon suivi, au bon moment.</strong><small>Votre savoir-faire mérite d'être choisi.</small></div></div></div></section>
-<section class="method" id="methode"><div><p class="eyebrow">UN RITUEL SIMPLE</p><h2>Du devis envoyé<br>au prochain échange.</h2></div><div class="steps"><article><span>01</span><h3>Rassemblez vos devis</h3><p>Ajoutez vos opportunités ou importez un CSV. Conservez votre logiciel de facturation habituel.</p></article><article><span>02</span><h3>Sachez qui rappeler</h3><p>Retrouvez les prochaines relances et préparez un message adapté au stade de votre échange.</p></article><article><span>03</span><h3>Gardez le contrôle</h3><p>Vous envoyez depuis votre messagerie, puis vous mettez à jour le suivi. Aucun envoi automatique dans ce pilote.</p></article></div></section>
-<section class="offer" id="offre"><div><p class="eyebrow">OFFRE FONDATRICE · HYPOTHÈSE À VALIDER</p><h2>Un outil utile.<br>Un démarrage accompagné.</h2><p>Installation du suivi, reprise de vos devis et paramétrage de vos modèles. Puis un point mensuel pour ajuster votre méthode.</p><p class="subtle">Le pilote actuel permet de tester le parcours. La vente du service sera ouverte après configuration du paiement et des conditions contractuelles.</p></div><div class="price"><span>LE PILOTE ACCOMPAGNÉ</span><p><strong>79 €</strong> / mois HT</p><p>+ 290 € HT de mise en route</p><ul><li>Un espace de suivi pour votre entreprise</li><li>Import CSV et modèles de relance</li><li>Accompagnement au démarrage</li><li>Sans engagement de durée proposé</li></ul><button class="primary" id="buy">Vérifier la disponibilité <span>↗</span></button><small id="payment-note">Paiement non configuré · Aucun prélèvement</small></div></section><footer><a class="brand" href="#">devispilot ↗</a><span>Prototype privé · Nom de travail · Aucun résultat commercial garanti</span><button data-open class="text-link">Explorer le cockpit</button></footer></main>
-<section id="app" hidden><aside><a href="#" class="brand"><span class="logo">d↗</span>devispilot</a><div class="workspace"><span class="avatar">AC</span><div><strong>Atelier Confort</strong><small>Espace pilote</small></div></div><button data-tab="pipeline" class="nav-item active">▦ <span>Vue d'ensemble</span></button><button data-tab="followups" class="nav-item">↗ <span>Relances à préparer</span></button><button data-tab="settings" class="nav-item">⚙ <span>Offre & paiement</span></button><div class="aside-bottom"><p><i></i> Stockage dans ce navigateur</p><button id="back" class="nav-item">← Retour à la présentation</button></div></aside><div class="app-main"><div class="app-top"><span>Votre espace commercial / <b id="breadcrumb">Vue d'ensemble</b></span><span class="avatar">BB</span></div><div class="notice"><span id="data-label">DONNÉES DE DÉMONSTRATION</span><p>Ce pilote sauvegarde vos modifications uniquement sur cet appareil. Aucun message n'est envoyé automatiquement.</p><button id="reset">Réinitialiser la démo</button></div><div id="pipeline" class="tab"><div class="page-title"><div><p class="eyebrow" id="today"></p><h2>Chaque opportunité compte<span>.</span></h2><p>Une vue claire. Le prochain geste, tout de suite.</p></div><button id="add" class="primary">+ Ajouter un devis</button></div><div class="stats" id="stats"></div><div class="panel"><div class="panel-header"><div><h3>Votre portefeuille de devis</h3><p id="count"></p></div><div class="tools"><button id="import">↥ Importer CSV</button><button id="export">↧ Exporter</button><input type="file" accept=".csv,text/csv" id="csv" hidden></div></div><div class="filters"><label class="search">⌕ <input id="search" placeholder="Rechercher un client, un projet…" aria-label="Rechercher"></label><select id="filter" aria-label="Filtrer les devis"><option value="all">Tous les statuts</option><option value="sent">Envoyé</option><option value="replied">Réponse reçue</option><option value="won">Signé</option><option value="lost">Perdu</option></select></div><div class="table-wrap"><table><thead><tr><th>CLIENT / PROJET</th><th>MONTANT HT</th><th>STATUT</th><th>PROCHAINE ACTION</th><th></th></tr></thead><tbody id="rows"></tbody></table></div><p class="table-note">Les montants signés sont déclaratifs. Ils ne représentent pas des paiements encaissés.</p></div><div class="bottom-panels"><div class="tip"><span>↗</span><div><h3>Un devis sans réponse n'est pas un refus.</h3><p>Proposez un échange court, apportez une précision utile et respectez le choix du client.</p></div></div><div class="goal"><p class="eyebrow">VOTRE RITUEL DE LA SEMAINE</p><h3>15 minutes pour faire le point.</h3><button data-tab="followups" class="text-link">Préparer mes relances →</button></div></div></div>
-<div id="followups" class="tab" hidden><div class="page-title"><div><p class="eyebrow">VOTRE PROCHAINE ACTION</p><h2>La relation, avant la relance.</h2><p>Messages préparés avec des modèles. Relisez-les avant tout envoi.</p></div></div><div id="queue"></div></div>
-<div id="settings" class="tab" hidden><div class="page-title"><div><p class="eyebrow">PILOTAGE DE L'OFFRE</p><h2>Du service au revenu.</h2><p>Paramétrez le lien de paiement de votre propre offre DevisPilot.</p></div></div><div class="settings-grid"><form id="settings-form" class="panel form-panel"><h3>Votre offre commerciale</h3><p>Stripe héberge la page de paiement. Aucune clé secrète n'est demandée ici.</p><label>Nom de votre entreprise<input name="company" required maxlength="100"></label><label>Signature des relances<input name="signature" required maxlength="100"></label><label>Lien Stripe Payment Link de votre offre<input name="stripe" type="url" placeholder="https://buy.stripe.com/…"></label><p class="subtle">Créez dans Stripe une offre à 79 €/mois HT et les frais de mise en route à 290 € HT. Vérifiez la fiscalité et le récapitulatif du checkout. Ce lien encaisse votre service ; il ne connecte pas les comptes Stripe de vos clients.</p><button class="primary">Enregistrer les paramètres</button><a href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener" class="text-link">Ouvrir Stripe ↗</a></form><div class="panel form-panel"><p class="eyebrow">PLAN DE VALIDATION · OBJECTIFS, PAS PRÉVISIONS</p><h3>Vendre avant d'automatiser.</h3><ol><li>Contacter personnellement 20 installateurs de climatisation / chauffage.</li><li>Faire 5 entretiens et montrer le cockpit sur leurs cas concrets.</li><li>Obtenir 3 pilotes payants, sans promesse de gain garanti.</li><li>Mesurer le temps de suivi, les réponses et les devis signés durant 30 jours.</li></ol><div class="math"><strong>10 clients × 79 € = 790 €</strong><p>de revenu mensuel récurrent HT théorique, avant frais Stripe, hébergement, temps d'accompagnement, acquisition et impôts.</p></div><p class="subtle">Avant ouverture publique : stockage serveur isolé par entreprise, authentification, validation des abonnements par webhook Stripe, CGV, confidentialité et gestion de suppression des données. Les envois automatiques et l'IA ne sont pas inclus dans ce prototype.</p><button id="clear" class="danger">Effacer toutes les données locales</button></div></div></div></div></section>
-<dialog id="editor"><form id="quote-form"><div class="dialog-head"><div><p class="eyebrow">UNE OPPORTUNITÉ À SUIVRE</p><h2 id="editor-title">Ajouter un devis</h2></div><button type="button" class="close" data-close>×</button></div><input name="id" type="hidden"><div class="form-grid"><label>Client<input name="client" required maxlength="100" placeholder="Ex. Maison Laurent"></label><label>Email<input name="email" type="email" maxlength="200" placeholder="client@exemple.fr"></label><label class="full">Projet<input name="project" required maxlength="200" placeholder="Ex. Installation pompe à chaleur"></label><label>Montant HT (€)<input name="amount" type="number" min="0.01" max="10000000" step="0.01" required></label><label>Date d'envoi<input name="sent" type="date" required></label><label>Statut<select name="status"><option value="sent">Envoyé</option><option value="replied">Réponse reçue</option><option value="won">Signé</option><option value="lost">Perdu</option></select></label><label>Prochaine relance<input name="next" type="date" required></label><label class="full">Notes<textarea name="notes" rows="2" maxlength="2000" placeholder="Contexte, disponibilités, objections…"></textarea></label></div><div class="dialog-footer"><button type="button" id="delete" class="danger" hidden>Supprimer</button><button class="primary">Enregistrer le devis</button></div></form></dialog>
-<dialog id="composer"><div class="dialog-head"><div><p class="eyebrow">MODÈLE DE RELANCE · ENVOI MANUEL</p><h2 id="compose-title">Reprendre contact</h2></div><button class="close" data-close>×</button></div><label>Approche<select id="tone"><option value="gentle">Prendre des nouvelles</option><option value="help">Proposer un échange</option><option value="closing">Clôturer le suivi avec respect</option></select></label><label>Objet<input id="subject" maxlength="200"></label><label>Message<textarea id="message" rows="9"></textarea></label><div class="compose-tools"><button id="copy">Copier le message</button><button id="mail" class="primary">Ouvrir ma messagerie ↗</button></div><p class="subtle">Ouvrir la messagerie ne confirme pas l'envoi. Après envoi réel, enregistrez le suivi ci-dessous.</p><button id="done" class="outline">J'ai envoyé la relance · Revoir dans 7 jours</button></dialog><div id="toast" role="status"></div><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#144c3e">
+<meta name="description" content="DevisPilot, le cockpit de suivi des devis pour les artisans climatisation et chauffage. Repérez qui rappeler, préparez votre message, enregistrez la suite.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23144c3e'/%3E%3Cpath d='M10 22 22 10M12 10h10v10' stroke='%23def384' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>DevisPilot · Vos devis méritent une suite</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<svg aria-hidden="true" style="display:none">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9.5a6 6 0 1 0-12 0c0 5.5-2.3 6.8-2.3 6.8h16.6S18 15 18 9.5Z"/><path d="M10.2 19.5a2 2 0 0 0 3.6 0"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h9M19 8h1M4 16h3M13 16h7"/><circle cx="16" cy="8" r="2.1"/><circle cx="10" cy="16" r="2.1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-3.7-3.7"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5v-11m0 0-3.8 3.8M12 4.5l3.8 3.8"/><path d="M5 19.5h14"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v11m0 0 3.8-3.8M12 15.5l-3.8-3.8"/><path d="M5 19.5h14"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12.5 20h8"/><path d="M16.7 3.8a2.1 2.1 0 0 1 3 3L7.5 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7.5 8.5 6 8.5-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11.5" height="11.5" rx="2"/><path d="M5.5 15h-.7A1.8 1.8 0 0 1 3 13.2V4.8A1.8 1.8 0 0 1 4.8 3h8.4A1.8 1.8 0 0 1 15 4.8v.7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5L19.5 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.8M12 16.3h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.2V16M12 7.7h.01"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.3 2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7M6.8 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h5.6a1.5 1.5 0 0 0 1.5-1.3L17.2 7"/><path d="M10.2 11v6M13.8 11v6"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 0 1-8.5 8.5c-1.4 0-2.8-.3-4-.9L3.5 20.5l1-4.3A8.5 8.5 0 1 1 20.5 12Z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m20.5 3.5-9 9"/><path d="M20.5 3.5 14 20.5l-2.5-8-8-2.5Z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+</svg>
+
+<!-- ==================== PAGE COMMERCIALE ==================== -->
+<header class="site-header">
+  <a class="brand" href="#" aria-label="DevisPilot, retour en haut">
+    <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+    devispilot<span class="beta">Pilote</span>
+  </a>
+  <nav class="site-nav" aria-label="Navigation principale">
+    <a href="#methode">La méthode</a>
+    <a href="#offre">L'offre</a>
+    <a href="#faq">Questions</a>
+    <button class="btn btn-dark btn-sm" data-open>Tester la démo</button>
+  </nav>
+</header>
+
+<main id="landing">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow"><i></i>Pour les artisans climatisation &amp; chauffage</p>
+      <h1>Vos devis méritent <em>une suite.</em></h1>
+      <p class="lead">DevisPilot est le cockpit de suivi commercial des petites entreprises du confort thermique. Voyez quels devis attendent, préparez le bon message et gardez la trace de chaque échange.</p>
+      <div class="actions">
+        <button class="btn btn-primary" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
+        <a class="btn btn-quiet" href="#offre">Voir l'offre pilote</a>
+      </div>
+      <p class="subtle">Démo sans inscription · données fictives · aucun envoi automatique</p>
+      <ul class="hero-tags" aria-label="Métiers concernés">
+        <li>Climatisation</li>
+        <li>Chauffage</li>
+        <li>Pompes à chaleur</li>
+      </ul>
+    </div>
+
+    <div class="hero-mock" role="img" aria-label="Aperçu fictif du cockpit DevisPilot : liste des relances du jour et message préparé">
+      <div class="mock-window">
+        <div class="mock-head">
+          <span class="mock-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>Cockpit — relances du jour</span>
+          <span class="mock-badge">Données fictives</span>
+        </div>
+        <div class="mock-body">
+          <div class="mock-row">
+            <span class="avatar">ML</span>
+            <div class="mock-row-main">
+              <strong>Maison Laurent</strong>
+              <small>Pompe à chaleur · 6 480 € · envoyé il y a 7 j</small>
+            </div>
+            <span class="badge badge-due"><svg class="icon"><use href="#i-clock"/></svg>À relancer</span>
+          </div>
+          <div class="mock-row">
+            <span class="avatar">RO</span>
+            <div class="mock-row-main">
+              <strong>Résidence des Oliviers</strong>
+              <small>Climatisation · 4 250 € · réponse reçue</small>
+            </div>
+            <span class="badge badge-replied"><svg class="icon"><use href="#i-msg"/></svg>Réponse reçue</span>
+          </div>
+          <div class="mock-msg">
+            <p class="mock-msg-label"><svg class="icon"><use href="#i-mail"/></svg>Message préparé — à vérifier avant envoi</p>
+            <p>« Bonjour Mme Laurent, avez-vous pu regarder notre proposition pour la pompe à chaleur ? Je reste disponible pour faire le point. »</p>
+          </div>
+          <div class="mock-foot">
+            <span class="mock-check"><svg class="icon"><use href="#i-check"/></svg>Vous validez chaque envoi</span>
+            <span class="mock-cta">Préparer la relance<svg class="icon"><use href="#i-arrow"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="method" id="methode">
+    <div class="method-intro">
+      <p class="eyebrow"><i></i>Un rituel simple</p>
+      <h2>Trois gestes,<br>aucun devis oublié.</h2>
+      <p class="section-lead">DevisPilot ne remplace ni votre logiciel de facturation ni votre messagerie. Il garde le fil de vos opportunités.</p>
+    </div>
+    <div class="steps">
+      <article>
+        <span class="step-num">01</span>
+        <div class="step-icon"><svg class="icon"><use href="#i-plus"/></svg></div>
+        <h3>Ajoutez un devis</h3>
+        <p>Saisissez le client, le projet et le montant, ou importez un fichier CSV. Planifiez la date de votre prochaine relance.</p>
+      </article>
+      <article>
+        <span class="step-num">02</span>
+        <div class="step-icon"><svg class="icon"><use href="#i-mail"/></svg></div>
+        <h3>Préparez le suivi</h3>
+        <p>Chaque matin, les relances dues sont listées. Un message adapté au stade de l'échange est préparé : relisez-le, ajustez-le, envoyez-le depuis votre messagerie.</p>
+      </article>
+      <article>
+        <span class="step-num">03</span>
+        <div class="step-icon"><svg class="icon"><use href="#i-check"/></svg></div>
+        <h3>Enregistrez le résultat</h3>
+        <p>Déclarez l'envoi, notez la réponse et programmez la prochaine étape. Votre portefeuille reste à jour, sans double saisie.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="offer" id="offre">
+    <div class="offer-copy">
+      <p class="eyebrow eyebrow-light"><i></i>Proposition pilote · à valider avec vous</p>
+      <h2>Un démarrage accompagné, pas un logiciel de plus.</h2>
+      <p>Nous reprenons vos devis en cours, paramétrons vos modèles de relance et installons votre rituel de suivi. Ensuite, un point mensuel pour ajuster la méthode.</p>
+      <p class="offer-note">Cette offre est une hypothèse commerciale en cours de validation. Le prototype que vous testez illustre le parcours : la vente du service sera ouverte après mise en place du paiement et des conditions contractuelles.</p>
+    </div>
+    <div class="price" aria-label="Tarifs de l'offre pilote">
+      <p class="price-label">Le pilote accompagné</p>
+      <p class="price-main"><strong>290 €</strong> HT <span>de mise en route</span></p>
+      <p class="price-sub">puis <strong>79 €</strong> HT / mois</p>
+      <ul>
+        <li><svg class="icon"><use href="#i-check"/></svg>Un espace de suivi pour votre entreprise</li>
+        <li><svg class="icon"><use href="#i-check"/></svg>Reprise de vos devis et import CSV</li>
+        <li><svg class="icon"><use href="#i-check"/></svg>Modèles de messages adaptés à votre ton</li>
+        <li><svg class="icon"><use href="#i-check"/></svg>Point mensuel avec un humain</li>
+      </ul>
+      <button class="btn btn-primary btn-block" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
+      <button class="btn btn-quiet btn-block" id="buy">Vérifier la disponibilité de l'offre</button>
+      <small id="payment-note" class="price-note">Paiement non configuré · aucun prélèvement</small>
+    </div>
+  </section>
+
+  <section class="faq" id="faq">
+    <div class="faq-intro">
+      <p class="eyebrow"><i></i>Questions fréquentes</p>
+      <h2>Ce qu'il faut savoir avant de tester.</h2>
+    </div>
+    <div class="faq-list">
+      <details>
+        <summary>Comment fonctionne DevisPilot au quotidien ?<svg class="icon"><use href="#i-chev"/></svg></summary>
+        <p>Chaque devis possède une date de prochaine relance. Le cockpit affiche ce qui est dû aujourd'hui, prépare un message que vous relisez, puis vous envoyez depuis votre propre messagerie. Après l'envoi, vous déclarez la relance et planifiez la suite.</p>
+      </details>
+      <details>
+        <summary>Où sont stockées mes données ?<svg class="icon"><use href="#i-chev"/></svg></summary>
+        <p>Dans ce prototype, tout reste dans le navigateur de cet appareil (localStorage). Rien n'est envoyé à un serveur, rien n'est synchronisé entre vos appareils. L'export CSV vous permet de récupérer vos devis à tout moment.</p>
+      </details>
+      <details>
+        <summary>Les relances partent-elles automatiquement ?<svg class="icon"><use href="#i-chev"/></svg></summary>
+        <p>Non. DevisPilot prépare le message, vous l'envoyez vous-même. Ouvrir votre messagerie depuis le cockpit n'enregistre rien : seule votre confirmation manuelle déclare l'envoi. Aucune IA n'est connectée dans ce pilote ; les modèles sont fixes et relus par vous.</p>
+      </details>
+      <details>
+        <summary>Comment se passe le paiement de l'offre ?<svg class="icon"><use href="#i-chev"/></svg></summary>
+        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Ce prototype n'encaisse rien et ne demande aucune carte : il permet seulement de valider le parcours.</p>
+      </details>
+      <details>
+        <summary>Puis-je importer mes devis existants ?<svg class="icon"><use href="#i-chev"/></svg></summary>
+        <p>Oui, via un fichier CSV (colonnes : client, email, project, amount, sent, status, next, notes). Exportez d'abord le modèle depuis le cockpit pour obtenir le format exact.</p>
+      </details>
+    </div>
+  </section>
+
+  <p class="limits">Pilote de validation : données dans ce navigateur uniquement, envois manuels, aucun compte client ni vérification de paiement.</p>
+
+  <footer class="site-footer">
+    <a class="brand" href="#">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+      devispilot
+    </a>
+    <span>Prototype privé · nom de travail · aucun résultat commercial garanti</span>
+    <button class="btn btn-quiet" data-open>Explorer le cockpit</button>
+  </footer>
+</main>
+
+<!-- ==================== COCKPIT ==================== -->
+<section id="app" hidden aria-label="Cockpit DevisPilot">
+
+  <aside class="sidebar">
+    <a href="#" class="brand" id="brand-home">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+      devispilot
+    </a>
+    <div class="workspace">
+      <span class="avatar" id="ws-avatar">AC</span>
+      <div>
+        <strong id="ws-name">Atelier Confort</strong>
+        <small>Espace pilote · local</small>
+      </div>
+    </div>
+    <nav class="side-nav" aria-label="Navigation du cockpit">
+      <button data-tab="pipeline" class="nav-item active">
+        <svg class="icon"><use href="#i-grid"/></svg><span>Vue d'ensemble</span>
+      </button>
+      <button data-tab="followups" class="nav-item">
+        <svg class="icon"><use href="#i-bell"/></svg><span>Relances à préparer</span>
+        <span class="nav-count" id="nav-due" hidden>0</span>
+      </button>
+      <button data-tab="settings" class="nav-item">
+        <svg class="icon"><use href="#i-sliders"/></svg><span>Offre &amp; réglages</span>
+      </button>
+    </nav>
+    <div class="aside-bottom">
+      <p class="storage-note"><svg class="icon"><use href="#i-info"/></svg>Données stockées dans ce navigateur uniquement.</p>
+      <button id="back" class="nav-item"><svg class="icon"><use href="#i-back"/></svg><span>Retour à la présentation</span></button>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <div class="app-top">
+      <span class="crumb">Votre espace commercial <span aria-hidden="true">/</span> <b id="breadcrumb">Vue d'ensemble</b></span>
+      <span class="avatar" id="top-avatar">AC</span>
+    </div>
+
+    <div class="notice" id="notice" role="status">
+      <span class="notice-label" id="data-label">Données de démonstration</span>
+      <p id="notice-text">Ce pilote sauvegarde vos modifications uniquement sur cet appareil. Aucun message n'est envoyé automatiquement.</p>
+      <button class="btn btn-quiet btn-sm" id="notice-action">Retirer les exemples</button>
+    </div>
+
+    <!-- Vue d'ensemble -->
+    <div id="pipeline" class="tab">
+      <div class="page-title">
+        <div>
+          <p class="eyebrow" id="today"></p>
+          <h2>Qui rappeler aujourd'hui&nbsp;?</h2>
+          <p class="page-sub">Une vue claire de votre portefeuille. Le prochain geste, tout de suite.</p>
+        </div>
+        <button id="add" class="btn btn-primary"><svg class="icon"><use href="#i-plus"/></svg>Ajouter un devis</button>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="due-strip" id="due-strip" hidden>
+        <div class="due-strip-head">
+          <h3><svg class="icon"><use href="#i-bell"/></svg>Relances à préparer</h3>
+          <button class="btn btn-quiet btn-sm" data-tab="followups">Tout voir</button>
+        </div>
+        <div id="due-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Votre portefeuille de devis</h3>
+            <p id="count"></p>
+          </div>
+          <div class="tools">
+            <button class="btn btn-outline btn-sm" id="import"><svg class="icon"><use href="#i-upload"/></svg>Importer CSV</button>
+            <button class="btn btn-outline btn-sm" id="export"><svg class="icon"><use href="#i-download"/></svg>Exporter</button>
+            <input type="file" accept=".csv,text/csv" id="csv" hidden>
+          </div>
+        </div>
+        <div class="filters">
+          <label class="search">
+            <svg class="icon"><use href="#i-search"/></svg>
+            <input id="search" placeholder="Rechercher un client, un projet…" aria-label="Rechercher un devis">
+          </label>
+          <select id="filter" aria-label="Filtrer les devis">
+            <option value="all">Tous les devis</option>
+            <option value="due">À relancer</option>
+            <option value="sent">Envoyé</option>
+            <option value="replied">Réponse reçue</option>
+            <option value="won">Signé</option>
+            <option value="lost">Perdu</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Client / projet</th>
+                <th scope="col">Montant HT</th>
+                <th scope="col">Statut</th>
+                <th scope="col">Prochaine action</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <div class="cards" id="cards"></div>
+
+        <div class="empty-state" id="empty" hidden>
+          <svg class="icon empty-icon"><use href="#i-mail"/></svg>
+          <h3 id="empty-title">Aucun devis pour l'instant</h3>
+          <p id="empty-text">Ajoutez votre première opportunité pour commencer le suivi.</p>
+          <button class="btn btn-primary" id="empty-add"><svg class="icon"><use href="#i-plus"/></svg>Ajouter un devis</button>
+        </div>
+
+        <p class="table-note">Les devis « signés » sont déclaratifs : aucun montant n'est présenté comme encaissé. Le pilote ne vérifie pas les paiements.</p>
+      </div>
+    </div>
+
+    <!-- Relances -->
+    <div id="followups" class="tab" hidden>
+      <div class="page-title">
+        <div>
+          <p class="eyebrow">Votre prochaine action</p>
+          <h2>La relation, avant la relance.</h2>
+          <p class="page-sub">Des modèles fixes préparent chaque message. Vous relisez, vous envoyez, vous déclarez.</p>
+        </div>
+      </div>
+      <div id="queue"></div>
+    </div>
+
+    <!-- Réglages -->
+    <div id="settings" class="tab" hidden>
+      <div class="page-title">
+        <div>
+          <p class="eyebrow">Pilotage de l'offre</p>
+          <h2>Réglages de l'espace pilote.</h2>
+          <p class="page-sub">Identité de vos messages, lien de paiement de l'offre et gestion des données locales.</p>
+        </div>
+      </div>
+      <div class="settings-grid">
+        <form id="settings-form" class="panel form-panel" novalidate>
+          <h3>Votre entreprise et votre offre</h3>
+          <p class="form-intro">Ces informations signent vos messages préparés. Le lien de paiement est celui de <em>votre</em> offre accompagnée, hébergé par Stripe.</p>
+          <div class="field">
+            <label for="f-company">Nom de votre entreprise</label>
+            <input id="f-company" name="company" required maxlength="100" placeholder="Ex. Atelier Confort">
+            <p class="field-error" id="err-company" hidden></p>
+          </div>
+          <div class="field">
+            <label for="f-signature">Signature des relances</label>
+            <input id="f-signature" name="signature" required maxlength="100" placeholder="Ex. Karim, votre artisan">
+            <p class="field-error" id="err-signature" hidden></p>
+          </div>
+          <div class="field">
+            <label for="f-stripe">Lien Stripe Payment Link de votre offre <span class="opt">(optionnel)</span></label>
+            <input id="f-stripe" name="stripe" type="url" placeholder="https://buy.stripe.com/…" aria-describedby="stripe-hint err-stripe">
+            <p class="field-hint" id="stripe-hint">Créez dans Stripe une page à 290 € HT de mise en route puis 79 € HT/mois. Aucune clé secrète n'est demandée ni stockée ici.</p>
+            <p class="field-error" id="err-stripe" hidden></p>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Enregistrer les paramètres</button>
+            <a class="btn btn-quiet" href="https://dashboard.stripe.com/payment-links" target="_blank" rel="noopener">Ouvrir Stripe<svg class="icon"><use href="#i-arrow"/></svg></a>
+          </div>
+        </form>
+
+        <div class="settings-side">
+          <div class="panel form-panel">
+            <p class="eyebrow"><i></i>Plan de validation · objectifs, pas prévisions</p>
+            <h3>Vendre avant d'automatiser.</h3>
+            <ol class="plan">
+              <li>Contacter personnellement 20 installateurs climatisation / chauffage.</li>
+              <li>Faire 5 entretiens et montrer le cockpit sur leurs cas concrets.</li>
+              <li>Obtenir 3 pilotes payants, sans promesse de gain garanti.</li>
+              <li>Mesurer le temps de suivi, les réponses et les devis signés sur 30 jours.</li>
+            </ol>
+            <div class="math">
+              <strong>10 clients × 79 € = 790 €</strong>
+              <p>de revenu mensuel récurrent HT <em>théorique</em>, avant frais Stripe, hébergement, accompagnement, acquisition et impôts.</p>
+            </div>
+            <p class="subtle">Avant ouverture publique : stockage serveur isolé par entreprise, authentification, vérification des abonnements par webhook Stripe, CGV, confidentialité et suppression des données.</p>
+          </div>
+
+          <div class="panel form-panel danger-zone">
+            <h3>Données de cet appareil</h3>
+            <p class="form-intro">Les exemples sont marqués et peuvent être retirés sans toucher à vos devis. Chaque action est confirmée avant d'être appliquée.</p>
+            <div class="danger-actions">
+              <button class="btn btn-outline btn-sm" id="remove-seed"><svg class="icon"><use href="#i-trash"/></svg>Retirer les devis d'exemple</button>
+              <button class="btn btn-outline btn-sm" id="reset"><svg class="icon"><use href="#i-download"/></svg>Charger les exemples</button>
+              <button class="btn btn-danger btn-sm" id="clear"><svg class="icon"><use href="#i-alert"/></svg>Effacer toutes les données locales</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation mobile -->
+  <nav class="mobile-nav" aria-label="Navigation du cockpit">
+    <button data-tab="pipeline" class="mobile-item active">
+      <svg class="icon"><use href="#i-grid"/></svg><span>Devis</span>
+    </button>
+    <button data-tab="followups" class="mobile-item">
+      <svg class="icon"><use href="#i-bell"/></svg><span>Relances</span>
+      <span class="nav-count" id="nav-due-m" hidden>0</span>
+    </button>
+    <button data-tab="settings" class="mobile-item">
+      <svg class="icon"><use href="#i-sliders"/></svg><span>Réglages</span>
+    </button>
+    <button class="mobile-item" id="back-m">
+      <svg class="icon"><use href="#i-back"/></svg><span>Sortir</span>
+    </button>
+  </nav>
+</section>
+
+<!-- ==================== DIALOGUES ==================== -->
+<dialog id="editor" aria-labelledby="editor-title">
+  <form id="quote-form" novalidate>
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow"><i></i>Une opportunité à suivre</p>
+        <h2 id="editor-title">Ajouter un devis</h2>
+      </div>
+      <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <input name="id" type="hidden">
+    <div class="form-grid">
+      <div class="field">
+        <label for="q-client">Client <span class="req" aria-hidden="true">*</span></label>
+        <input id="q-client" name="client" required maxlength="100" placeholder="Ex. Maison Laurent" aria-describedby="err-client">
+        <p class="field-error" id="err-client" hidden></p>
+      </div>
+      <div class="field">
+        <label for="q-email">Email <span class="opt">(pour ouvrir la messagerie)</span></label>
+        <input id="q-email" name="email" type="email" maxlength="200" placeholder="client@exemple.fr" aria-describedby="err-email">
+        <p class="field-error" id="err-email" hidden></p>
+      </div>
+      <div class="field full">
+        <label for="q-project">Projet <span class="req" aria-hidden="true">*</span></label>
+        <input id="q-project" name="project" required maxlength="200" placeholder="Ex. Installation pompe à chaleur" aria-describedby="err-project">
+        <p class="field-error" id="err-project" hidden></p>
+      </div>
+      <div class="field">
+        <label for="q-amount">Montant HT (€) <span class="req" aria-hidden="true">*</span></label>
+        <input id="q-amount" name="amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" required placeholder="Ex. 6480" aria-describedby="err-amount">
+        <p class="field-error" id="err-amount" hidden></p>
+      </div>
+      <div class="field">
+        <label for="q-sent">Date d'envoi <span class="req" aria-hidden="true">*</span></label>
+        <input id="q-sent" name="sent" type="date" required aria-describedby="err-sent">
+        <p class="field-error" id="err-sent" hidden></p>
+      </div>
+      <div class="field">
+        <label for="q-status">Statut</label>
+        <select id="q-status" name="status">
+          <option value="sent">Envoyé</option>
+          <option value="replied">Réponse reçue</option>
+          <option value="won">Signé (déclaré)</option>
+          <option value="lost">Perdu</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="q-next">Prochaine relance <span class="req" aria-hidden="true">*</span></label>
+        <input id="q-next" name="next" type="date" required aria-describedby="err-next">
+        <p class="field-error" id="err-next" hidden></p>
+      </div>
+      <div class="field full">
+        <label for="q-notes">Notes <span class="opt">(contexte, objections…)</span></label>
+        <textarea id="q-notes" name="notes" rows="2" maxlength="2000" placeholder="Ex. attend le retour de son assurance, préfère être rappelé le soir"></textarea>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button type="button" id="delete" class="btn btn-danger btn-sm" hidden><svg class="icon"><use href="#i-trash"/></svg>Supprimer</button>
+      <button class="btn btn-primary" type="submit">Enregistrer le devis</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="composer" aria-labelledby="compose-title">
+  <div class="dialog-head">
+    <div>
+      <p class="eyebrow"><i></i>Modèle de relance · envoi manuel</p>
+      <h2 id="compose-title">Reprendre contact</h2>
+    </div>
+    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="field">
+    <label for="tone">Approche du message</label>
+    <select id="tone">
+      <option value="gentle">Prendre des nouvelles</option>
+      <option value="help">Proposer un échange</option>
+      <option value="closing">Clôturer le suivi avec respect</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="subject">Objet</label>
+    <input id="subject" maxlength="200">
+  </div>
+  <div class="field">
+    <label for="message">Message <span class="opt">(modifiable)</span></label>
+    <textarea id="message" rows="9"></textarea>
+  </div>
+  <div class="compose-tools">
+    <button class="btn btn-outline" id="copy"><svg class="icon"><use href="#i-copy"/></svg>Copier le message</button>
+    <button class="btn btn-primary" id="mail"><svg class="icon"><use href="#i-mail"/></svg>Ouvrir ma messagerie</button>
+  </div>
+  <p class="subtle">Ouvrir la messagerie ne confirme pas l'envoi et n'enregistre rien.</p>
+  <div class="compose-confirm">
+    <p class="compose-confirm-title"><svg class="icon"><use href="#i-check"/></svg>Après l'envoi réel</p>
+    <div class="compose-confirm-row">
+      <div class="field">
+        <label for="next-date">Prochain suivi</label>
+        <input id="next-date" type="date">
+      </div>
+      <button id="done" class="btn btn-outline">J'ai envoyé la relance</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="confirm" aria-labelledby="confirm-title">
+  <div class="dialog-head">
+    <div>
+      <p class="eyebrow"><i></i>Confirmation requise</p>
+      <h2 id="confirm-title">Confirmer</h2>
+    </div>
+    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <p id="confirm-text" class="confirm-text"></p>
+  <div class="dialog-footer">
+    <button class="btn btn-quiet" id="confirm-cancel">Annuler</button>
+    <button class="btn btn-danger" id="confirm-ok">Confirmer</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
