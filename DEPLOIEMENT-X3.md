@@ -86,6 +86,26 @@ build `npm run build`, output `dist`, env `VITE_API_URL=https://api.<domaine>`).
 L'API seule passe par le tunnel ; les requêtes sont cross-origin avec credentials —
 `CORS_ORIGINS` doit lister les deux origines frontend exactes.
 
+### Variables Vercel (pages légales)
+
+Les pages `/mentions-legales`, `/cgv` et `/confidentialite` lisent leurs
+valeurs depuis `config.js`, généré au build. Renseigner dans Vercel →
+Settings → Environment Variables (toutes obligatoires — le build échoue sinon) :
+
+```
+LEGAL_NAME=…
+LEGAL_SIREN=…
+LEGAL_RCS=…
+LEGAL_ADDRESS=…
+LEGAL_EMAIL=…
+LEGAL_VAT_MENTION=TVA non applicable, art. 293 B du CGI
+LEGAL_PUBLISHER=…
+```
+
+La version des CGV (`CGV_VERSION` dans `server/src/legal.ts`) est diffusée au
+front via `/api/config` — incrémenter la constante et redéployer l'API pour
+exiger une ré-acceptation.
+
 Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
 `curl -s https://api.<domaine>/health`.
 
@@ -105,6 +125,16 @@ Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
 4. Vérifier : `POST /api/billing/checkout` depuis l'espace client renvoie une
    URL `checkout.stripe.com`; l'événement test du dashboard apparaît traité
    (200) côté API.
+5. **Conformité factures** (micro-entreprise, franchise de TVA) — Paramètres :
+   - *Business* : nom légal, adresse et SIREN de l'entrepreneur.
+   - *Customer portal → Factures* ou *Billing* : pied de facture avec
+     « TVA non applicable, art. 293 B du CGI ».
+   - *Public details* : descripteur de relevé `DEVISPILOT`, URL des CGV
+     `https://<domaine>/cgv` et politique de confidentialité
+     `https://<domaine>/confidentialite` (elles s'affichent aussi en bas de
+     Checkout si renseignées dans les paramètres du compte).
+   - Stripe Tax : ne pas activer (aucune TVA collectée ; `automatic_tax`
+     n'est pas activé dans Checkout).
 
 ## 3. Création des premiers comptes
 

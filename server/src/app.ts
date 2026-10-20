@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.js';
 import { signupEnabledNow } from './settings.js';
 import miscRoutes from './routes/misc.js';
 import billingRoutes from './routes/billing.js';
+import legalRoutes from './routes/legal.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -103,6 +104,7 @@ export async function buildApp() {
   await app.register(importRoutes);
   await app.register(adminRoutes);
   await app.register(billingRoutes);
+  await app.register(legalRoutes);
 
   // Frontend statique (même origine que /api) + repli mono-page.
   await app.register(fastifyStatic, { root: config.staticRoot });

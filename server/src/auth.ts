@@ -3,6 +3,7 @@ import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { pool } from './db.js';
 import { config } from './config.js';
 import { sendMail, EMAIL_TEMPLATES } from './mailer.js';
+import { CGV_VERSION, recordCgvAcceptance, isPublicAuthCall } from './legal.js';
 
 // Authentification gérée par Better Auth (sessions serveur révocables,
 // hachage des mots de passe, cookies HttpOnly). Aucune crypto maison.
@@ -84,9 +85,22 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [config.baseUrl, ...config.corsOrigins],
-  // Un compte suspendu ne peut plus se connecter.
+  // Un compte suspendu ne peut plus se connecter ; l'inscription publique
+  // exige l'acceptation de la version courante des CGV.
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/sign-up/email') {
+        // Voie publique uniquement (en-tête CSRF) : les créations internes
+        // (invitation admin) n'ont pas d'acceptation interactive — le client
+        // acceptera les CGV à sa première connexion.
+        if (!isPublicAuthCall(ctx.request?.headers)) return;
+        if (ctx.body?.cgvAccepted !== true || ctx.body?.cgvVersion !== CGV_VERSION)
+          throw new APIError('BAD_REQUEST', {
+            message: 'Vous devez accepter les conditions générales de vente pour créer un compte.',
+            code: 'CGV_REQUIRED',
+          });
+        return;
+      }
       if (ctx.path !== '/sign-in/email') return;
       const email = String(ctx.body?.email ?? '').toLowerCase();
       if (!email) return;
@@ -94,6 +108,15 @@ export const auth = betterAuth({
         'SELECT suspended_at FROM "user" WHERE lower(email)=$1', [email]);
       if (rows[0]?.suspended_at)
         throw new APIError('FORBIDDEN', { message: 'Compte suspendu. Contactez le support.' });
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      // Enregistre l'acceptation des CGV de la voie publique (version + IP).
+      if (ctx.path !== '/sign-up/email' || !isPublicAuthCall(ctx.request?.headers)) return;
+      const user = (ctx.context as any)?.returned?.user;
+      if (!user?.id) return;
+      const ip = ctx.request?.headers.get('cf-connecting-ip')
+        ?? ctx.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+      await recordCgvAcceptance(user.id, ip).catch(() => {});
     }),
   },
   logger: { level: 'warn' },

@@ -138,17 +138,18 @@
         </div>
         <div class="price-plan">
           <strong>Pro</strong>
-          <p><b><span data-price="pro_monthly">—</span></b> HT / mois</p>
-          <small><span data-price="pro_yearly">—</span> HT / an · devis illimités</small>
+          <p><b><span data-price="pro_monthly">—</span></b> / mois</p>
+          <small><span data-price="pro_yearly">—</span> / an · devis illimités</small>
         </div>
         <div class="price-plan" data-plan-card="team">
           <strong>Équipe</strong>
-          <p><b><span data-price="team_monthly">—</span></b> HT / mois</p>
-          <small><span data-price="team_yearly">—</span> HT / an · Pro + plusieurs utilisateurs</small>
+          <p><b><span data-price="team_monthly">—</span></b> / mois</p>
+          <small><span data-price="team_yearly">—</span> / an · Pro + plusieurs utilisateurs</small>
         </div>
       </div>
       <button class="btn btn-primary btn-block" data-open>Créer un compte gratuit<svg class="icon"><use href="#i-arrow"/></svg></button>
       <small class="price-note">Sans engagement · changement d'offre à tout moment</small>
+      <small class="price-note" data-legal="vatMention"></small>
     </div>
   </section>
 
@@ -190,6 +191,11 @@
     </a>
     <span>DevisPilot — suivi des devis pour les artisans climatisation &amp; chauffage</span>
     <button class="btn btn-quiet" data-open>Créer un compte</button>
+    <nav class="legal-links" aria-label="Pages légales">
+      <a href="/mentions-legales">Mentions légales</a>
+      <a href="/cgv">CGV</a>
+      <a href="/confidentialite">Confidentialité</a>
+    </nav>
   </footer>
 </main>
 
@@ -274,6 +280,11 @@
           <label for="s-pass">Mot de passe <span class="opt">(12 caractères minimum)</span></label>
           <input id="s-pass" name="password" type="password" required minlength="12" autocomplete="new-password" placeholder="••••••••••">
         </div>
+        <label class="check-row" for="s-cgv">
+          <input type="checkbox" id="s-cgv" required>
+          <span>J'agis à des fins professionnelles et j'accepte les <a href="/cgv" target="_blank" rel="noopener">conditions générales de vente</a>.</span>
+        </label>
+        <p class="field-error" id="err-cgv" hidden></p>
         <p class="field-error" id="err-signup" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="signup-btn">Créer mon compte</button>
         <p class="subtle">Un email de vérification vous sera envoyé : il est nécessaire pour activer le compte.</p>
@@ -365,6 +376,11 @@
       <span class="notice-label" id="data-label">Connecté</span>
       <p id="notice-text">Données sauvegardées côté serveur, isolées par entreprise.</p>
       <button class="btn btn-quiet btn-sm" id="notice-action" hidden></button>
+    </div>
+
+    <div class="cgv-banner" id="cgv-banner" hidden role="alert">
+      <p>Nos <a href="/cgv" data-legal-link>conditions générales de vente</a> ont été mises à jour (version <b id="cgv-version-label"></b>). Merci de les accepter pour continuer.</p>
+      <button class="btn btn-primary btn-sm" id="cgv-accept">J'accepte les CGV</button>
     </div>
 
     <!-- Vue d'ensemble -->
@@ -611,6 +627,14 @@
     </div>
   </div>
 
+  <footer class="app-footer">
+    <nav class="legal-links" aria-label="Pages légales">
+      <a href="/mentions-legales">Mentions légales</a>
+      <a href="/cgv">CGV</a>
+      <a href="/confidentialite">Confidentialité</a>
+    </nav>
+  </footer>
+
   <!-- Navigation mobile -->
   <nav class="mobile-nav" aria-label="Navigation du cockpit">
     <button data-tab="pipeline" class="mobile-item active">
@@ -747,6 +771,113 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ==================== PAGES LÉGALES ==================== -->
+<section id="legal" hidden aria-label="Pages légales">
+  <div class="legal-wrap">
+    <a class="brand" href="/">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+      devispilot
+    </a>
+    <div class="legal-card panel">
+      <nav class="legal-nav" aria-label="Navigation des pages légales">
+        <a href="/mentions-legales" data-legal-page="mentions">Mentions légales</a>
+        <a href="/cgv" data-legal-page="cgv">CGV</a>
+        <a href="/confidentialite" data-legal-page="confidentialite">Confidentialité</a>
+      </nav>
+      <p class="legal-warn" id="legal-warn" hidden>Variables légales non configurées — environnement de développement uniquement.</p>
+
+      <article id="legal-mentions">
+        <h1>Mentions légales</h1>
+
+        <h2>Éditeur du service</h2>
+        <p>
+          <strong data-legal="name">—</strong><br>
+          SIREN&nbsp;: <span data-legal="siren">—</span> · <span data-legal="rcs">—</span><br>
+          Adresse&nbsp;: <span data-legal="address">—</span><br>
+          Email&nbsp;: <a data-legal-email href="#"><span data-legal="email">—</span></a>
+        </p>
+
+        <h2>Directeur de la publication</h2>
+        <p><span data-legal="publisher">—</span></p>
+
+        <h2>Hébergement</h2>
+        <p>Site web (frontend)&nbsp;: Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis.</p>
+        <p>Application et base de données&nbsp;: serveur exploité par l'éditeur, situé en France.</p>
+
+        <h2>Prestataires techniques</h2>
+        <p>Cloudflare Inc. (réseau de diffusion et tunnel sécurisé), 101 Townsend St, San Francisco, CA 94107, États-Unis.</p>
+      </article>
+
+      <article id="legal-cgv" hidden>
+        <h1>Conditions générales de vente</h1>
+        <p class="legal-version">Version du <span data-legal-version>—</span></p>
+
+        <h2>1. Objet et champ d'application</h2>
+        <p>Les présentes conditions générales de vente (« CGV ») régissent l'accès et l'utilisation du service DevisPilot, outil en ligne de suivi de devis et de relances, édité par <span data-legal="name">—</span> (« l'Éditeur »). Le service est réservé aux professionnels (artisans, entreprises). En créant un compte, vous déclarez agir à des fins professionnelles et acceptez sans réserve les présentes CGV.</p>
+
+        <h2>2. Offres et prix</h2>
+        <p>Le service est proposé selon les offres suivantes&nbsp;: <strong>Gratuit</strong>, limité à 10 devis actifs (non signés et non perdus) par entreprise, sans carte bancaire&nbsp;; et <strong>Pro</strong>, aux devis illimités, en abonnement mensuel ou annuel. Les prix sont affichés en euros, sans TVA&nbsp;: <span data-legal="vatMention">—</span>. Les montants en vigueur sont ceux affichés sur la page de paiement au moment de la souscription.</p>
+
+        <h2>3. Souscription et paiement</h2>
+        <p>La souscription s'effectue via une page de paiement sécurisée hébergée par Stripe, paiement d'avance par carte bancaire pour la période choisie (mensuelle ou annuelle). Un code promotionnel peut être appliqué à la souscription. Aucune donnée bancaire ne transite par nos serveurs.</p>
+
+        <h2>4. Durée, renouvellement et résiliation</h2>
+        <p>L'abonnement est souscrit pour la période choisie et se renouvelle par tacite reconduction. Vous pouvez résilier à tout moment depuis le portail de facturation accessible dans votre espace&nbsp;: la résiliation prend effet à la fin de la période en cours, sans remboursement au prorata. À l'échéance, le compte repasse automatiquement en offre Gratuit&nbsp;: aucune donnée n'est supprimée, seule la création de devis au-delà de la limite gratuite est bloquée.</p>
+
+        <h2>5. Défaut de paiement</h2>
+        <p>En cas d'échec de prélèvement, Stripe effectue des tentatives de recouvrement pendant lesquelles l'accès au service est maintenu. À l'issue de ces relances, l'abonnement est résilié et le compte repasse en offre Gratuit, sans perte de données.</p>
+
+        <h2>6. Absence de droit de rétractation</h2>
+        <p>Le service étant réservé aux professionnels, le droit de rétractation des contrats conclus à distance ne s'applique pas (article L. 221-3 du Code de la consommation).</p>
+
+        <h2>7. Modification des prix</h2>
+        <p>L'Éditeur peut modifier les prix des offres. Toute modification est notifiée par email au moins 30 jours avant son application aux abonnements en cours. Vous pouvez résilier avant l'entrée en vigueur du nouveau prix.</p>
+
+        <h2>8. Disponibilité et sauvegardes</h2>
+        <p>L'Éditeur s'engage à une obligation de moyens pour la disponibilité du service. Des opérations de maintenance peuvent interrompre temporairement l'accès. Les données sont sauvegardées quotidiennement.</p>
+
+        <h2>9. Responsabilité</h2>
+        <p>La responsabilité de l'Éditeur, tous fondements confondus, est limitée aux sommes effectivement versées par le client au cours des douze derniers mois précédant le fait générateur. L'Éditeur ne saurait être tenu des dommages indirects (perte d'exploitation, de clientèle, de données).</p>
+
+        <h2>10. Propriété des données</h2>
+        <p>Vous restez propriétaire de l'ensemble des données saisies (devis, clients, relances). Elles sont exportables à tout moment (CSV et JSON) et supprimées à la clôture du compte.</p>
+
+        <h2>11. Données personnelles et sous-traitance</h2>
+        <p>Le traitement des données personnelles est décrit dans la <a href="/confidentialite">politique de confidentialité</a>. Pour les données de vos propres clients saisies dans le service, vous êtes responsable de traitement et l'Éditeur agit en qualité de sous-traitant au sens de l'article 28 du RGPD&nbsp;: il traite ces données uniquement sur vos instructions documentées, garantit leur confidentialité et leur sécurité, informe de tout sous-traitant ultérieur, vous assiste dans l'exercice des droits des personnes, notifie toute violation de données et supprime les données en fin de contrat.</p>
+
+        <h2>12. Droit applicable et litiges</h2>
+        <p>Les présentes CGV sont soumises au droit français. Tout litige relatif à leur exécution ou leur interprétation relève des tribunaux compétents du ressort du siège de l'Éditeur.</p>
+      </article>
+
+      <article id="legal-privacy" hidden>
+        <h1>Politique de confidentialité</h1>
+
+        <h2>Données traitées et finalités</h2>
+        <p>DevisPilot traite les données suivantes&nbsp;: données de compte (nom, email, mot de passe chiffré), données de votre entreprise (raison sociale, SIREN, coordonnées, logo), et les données métier que vous saisissez (devis, montants, notes, ainsi que les coordonnées de vos clients finaux pour les relances). Ces données servent exclusivement à fournir le service&nbsp;: authentification, affichage de votre espace, préparation des messages de relance, facturation de l'abonnement et obligations légales comptables.</p>
+
+        <h2>Bases légales</h2>
+        <p>L'exécution du contrat (fourniture du service), l'intérêt légitime (sécurité, statistiques internes) et les obligations légales (conservation comptable des éléments de facturation).</p>
+
+        <h2>Durées de conservation</h2>
+        <p>Données de compte et données métier&nbsp;: pendant toute la durée de l'abonnement puis supprimées à la clôture du compte. Éléments de facturation&nbsp;: 10 ans, conformément aux obligations comptables. Journaux techniques&nbsp;: durée courte nécessaire à la sécurité.</p>
+
+        <h2>Sous-traitants</h2>
+        <p>Le service s'appuie sur&nbsp;: Vercel Inc. (hébergement du site web, États-Unis), Cloudflare Inc. (réseau sécurisé, États-Unis), Stripe (paiement, Irlande/Union européenne), Resend (emails transactionnels, Irlande/Union européenne). L'application et la base de données sont hébergées sur un serveur exploité par l'éditeur, situé en France.</p>
+
+        <h2>Vos droits</h2>
+        <p>Vous disposez des droits d'accès, de rectification, d'effacement, de portabilité, de limitation et d'opposition. L'export complet de vos données est disponible dans l'application (JSON et CSV), ainsi que la suppression de votre compte. Vous pouvez aussi écrire à <a data-legal-email href="#"><span data-legal="email">—</span></a>. Vous pouvez introduire une réclamation auprès de la CNIL (cnil.fr).</p>
+
+        <h2>Cookies</h2>
+        <p>L'application utilise un unique cookie de session, strictement nécessaire au fonctionnement du service (authentification). Aucun cookie de mesure d'audience ou publicitaire n'est déposé&nbsp;: aucun bandeau de consentement n'est donc requis.</p>
+
+        <h2>Accord de sous-traitance (art. 28 RGPD)</h2>
+        <p>Pour les données de vos clients finaux saisies dans DevisPilot, vous agissez en qualité de responsable de traitement et l'Éditeur en qualité de sous-traitant. L'Éditeur s'engage à&nbsp;: traiter ces données uniquement sur vos instructions documentées (fourniture du service)&nbsp;; garantir la confidentialité des personnes autorisées à y accéder&nbsp;; mettre en œuvre les mesures techniques et organisationnelles appropriées (chiffrement des accès, isolation par entreprise, sauvegardes)&nbsp;; vous informer avant tout recours à un sous-traitant ultérieur&nbsp;; vous assister dans l'exercice des droits des personnes concernées&nbsp;; vous notifier sans délai indu toute violation de données dont il aurait connaissance&nbsp;; et supprimer ou restituer les données à la fin du contrat.</p>
+      </article>
+    </div>
+    <button class="btn btn-quiet" data-legal-back>← Retour</button>
   </div>
 </section>
 

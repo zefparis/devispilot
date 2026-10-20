@@ -380,6 +380,48 @@ h3 { font-size: 16px; font-weight: 650; }
 }
 .plan-limit p { flex: 1; font-size: 13px; color: var(--ink); min-width: 200px; }
 
+/* --- Pages légales --- */
+.legal-wrap {
+  width: 100%; max-width: 760px; margin: 0 auto;
+  padding: 40px 20px 80px; display: grid; gap: 18px;
+}
+.legal-card { padding: 28px; }
+.legal-card h1 { font-size: 24px; margin-bottom: 18px; }
+.legal-card h2 { font-size: 16px; margin: 22px 0 8px; }
+.legal-card p { font-size: 14px; line-height: 1.65; color: var(--ink); margin-bottom: 8px; }
+.legal-card a { color: var(--green); }
+.legal-version { font-size: 12.5px; color: var(--muted); }
+.legal-nav { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.legal-nav a { font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.legal-nav a.active { color: var(--green); }
+.legal-warn {
+  background: var(--danger-soft, #fdecec); color: var(--danger, #b33333);
+  padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+}
+.legal-links { display: flex; gap: 18px; flex-wrap: wrap; }
+.legal-links a { font-size: 12.5px; color: var(--muted); text-decoration: none; }
+.legal-links a:hover { color: var(--ink); }
+.app-footer {
+  padding: 18px 28px 24px; border-top: 1px solid var(--line);
+  display: flex; justify-content: center;
+}
+@media (max-width: 900px) { .app-footer { padding-bottom: 90px; } }
+
+/* --- CGV --- */
+.cgv-banner {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--green-soft); border: 1px solid var(--green);
+  border-radius: 10px; padding: 12px 16px; margin: 0 28px 14px;
+}
+.cgv-banner p { flex: 1; font-size: 13.5px; min-width: 240px; }
+.cgv-banner a { color: var(--green); font-weight: 600; }
+.check-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; line-height: 1.5; cursor: pointer; margin-top: 14px;
+}
+.check-row input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--green); cursor: pointer; flex: none; }
+.check-row a { color: var(--green); font-weight: 600; }
+
 /* ---------- FAQ ---------- */
 .faq {
   max-width: 1280px; margin: auto; padding: 20px 4% 90px;

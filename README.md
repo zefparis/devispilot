@@ -39,10 +39,12 @@ Comptes réels : inscription (email + mot de passe ≥ 12 caractères, `SIGNUP_E
 
 Métier : création d'entreprise, sessions HttpOnly, devis CRUD, file de relances, confirmation manuelle avec prochaine date (atomique + idempotent), messages déterministes modifiables, import CSV validé (anti-doublon par empreinte), export CSV (BOM, neutralisation de formules), réglages signature + Payment Link validé `buy.stripe.com`, fiche entreprise (raison sociale, SIREN/SIRET, adresse, téléphone, email de contact, logo ≤ 200 Ko). Aucune donnée fictive.
 
+**Conformité** : pages `/mentions-legales`, `/cgv` (acceptation versionnée obligatoire à l'inscription et à la souscription, `cgv_acceptances` en base, ré-acceptation exigée au changement de `CGV_VERSION` dans `server/src/legal.ts`) et `/confidentialite` (avec accord de sous-traitance art. 28 RGPD). Valeurs injectées au build via les variables `LEGAL_*` — le build échoue en production si l'une manque.
+
 ## Limites (affichées dans le produit)
 
-Aucune vérification de paiement (« Paiements non connectés »), pas d'envoi automatique de relances (copier/mailto uniquement), pas d'IA, pas d'abonnement Stripe — les tarifs affichés sont des offres pilotes dont le périmètre reste à définir.
+Pas d'envoi automatique de relances (copier/mailto uniquement), pas d'IA, offre Équipe masquée (`TEAM_PLAN_ENABLED=false`) tant que l'invitation de membres n'existe pas.
 
 ## Commercial
 
-Offres pilotes affichées : Solo 19 € HT/mois, Équipe 39 € HT/mois, installation accompagnée facultative 99 € HT. Fonctionnalités et limites commerciales à définir. Aucun produit/abonnement Stripe créé ; la future activation reposera sur vérification serveur et webhooks signés idempotents (voir DEPLOIEMENT-X3.md §8).
+Offres Gratuit / Pro en mensuel et annuel, prix relus depuis l'API Stripe (aucun montant codé en dur), affichés sans TVA avec la mention de franchise. Souscription via Stripe Checkout, gestion via le portail client, webhooks signés et idempotents (voir DEPLOIEMENT-X3.md §5).

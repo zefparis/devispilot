@@ -25,6 +25,7 @@ process.env.STRIPE_PRICE_TEAM_YEARLY = 'price_team_y';
 const { buildApp } = await import('../src/app.js');
 const { migrate, pool } = await import('../src/db.js');
 const { outbox } = await import('../src/mailer.js');
+const { CGV_VERSION } = await import('../src/legal.js');
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 
@@ -37,7 +38,10 @@ const lastMailTo = (email: string, subjectMatch: RegExp) =>
 const tokenFrom = (mail: { text: string }) => /token=([A-Za-z0-9._-]+)/.exec(mail.text)?.[1];
 
 async function signupRaw(email: string, name = 'Test') {
-  return app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: H, payload: { email, password: PASSWORD, name } });
+  return app.inject({
+    method: 'POST', url: '/api/auth/sign-up/email', headers: H,
+    payload: { email, password: PASSWORD, name, cgvAccepted: true, cgvVersion: CGV_VERSION },
+  });
 }
 
 // Inscription complète : signup → email de vérification capturé → vérification → session.
@@ -572,4 +576,50 @@ test('abonnement : Checkout refuse les offres Équipe tant que TEAM_PLAN_ENABLED
   const r = await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: { ...H, cookie }, payload: { priceId: 'price_team_m' } });
   assert.equal(r.statusCode, 400, `team refusé → ${r.statusCode} ${r.body}`);
   assert.match(r.json().error, /offre inconnue/i);
+});
+
+/* ---------- CGV : acceptation obligatoire et versionnée ---------- */
+test('cgv : inscription refusée sans acceptation, enregistrée avec version', async () => {
+  const no = await app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: H, payload: { email: 'nocgv@x.fr', password: PASSWORD, name: 'N' } });
+  assert.equal(no.statusCode, 400, `sans case → ${no.statusCode}`);
+  const wrong = await app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: H, payload: { email: 'wrongv@x.fr', password: PASSWORD, name: 'N', cgvAccepted: true, cgvVersion: '1999-01-01' } });
+  assert.equal(wrong.statusCode, 400, 'ancienne version refusée');
+
+  await signup('cgv-ok@x.fr');
+  const { rows } = await pool.query(
+    `SELECT a.version, a.accepted_at FROM cgv_acceptances a JOIN "user" u ON u.id=a.user_id WHERE u.email='cgv-ok@x.fr'`);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].version, CGV_VERSION);
+});
+
+test('cgv : ré-acceptation exigée après changement de version', async () => {
+  const cookie = await signup('reaccept@x.fr');
+  await createCompany(cookie, 'Reaccept SARL');
+  const me1 = await app.inject({ method: 'GET', url: '/api/me', headers: { ...H, cookie } });
+  assert.equal(me1.json().cgv_current, true);
+  // Simule une montée de version : l'acceptation courante disparaît.
+  await pool.query(`DELETE FROM cgv_acceptances WHERE user_id=(SELECT id FROM "user" WHERE email='reaccept@x.fr')`);
+  const me2 = await app.inject({ method: 'GET', url: '/api/me', headers: { ...H, cookie } });
+  assert.equal(me2.json().cgv_current, false);
+  // Souscription bloquée tant que les CGV courantes ne sont pas acceptées.
+  const chk = await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: { ...H, cookie }, payload: { priceId: 'price_pro_m' } });
+  assert.equal(chk.statusCode, 428);
+  assert.equal(chk.json().code, 'CGV_REQUIRED');
+  // Mauvaise version → refusée ; bonne → enregistrée.
+  const bad = await app.inject({ method: 'POST', url: '/api/legal/accept', headers: { ...H, cookie }, payload: { version: '1999-01-01' } });
+  assert.equal(bad.statusCode, 400);
+  const ok = await app.inject({ method: 'POST', url: '/api/legal/accept', headers: { ...H, cookie }, payload: { version: CGV_VERSION } });
+  assert.equal(ok.statusCode, 200);
+  const me3 = await app.inject({ method: 'GET', url: '/api/me', headers: { ...H, cookie } });
+  assert.equal(me3.json().cgv_current, true);
+});
+
+test('cgv : pages légales publiques, acceptation exige une session', async () => {
+  for (const p of ['/mentions-legales', '/cgv', '/confidentialite']) {
+    const r = await app.inject({ method: 'GET', url: p });
+    assert.equal(r.statusCode, 200, `${p} → ${r.statusCode}`);
+    assert.match(r.body, /mentions légales|conditions générales|confidentialité/i, `${p} sert la SPA`);
+  }
+  const anon = await app.inject({ method: 'POST', url: '/api/legal/accept', headers: H, payload: { version: CGV_VERSION } });
+  assert.equal(anon.statusCode, 401);
 });

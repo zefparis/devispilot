@@ -33,6 +33,7 @@ const icon = (id, cls = 'icon') => `<svg class="${cls}" aria-hidden="true"><use 
 let mode = 'landing';            // 'landing' | 'live'
 let session = null;              // { user, company }
 let signupEnabled = false;
+let cgvVersion = '';             // version des CGV lue depuis /api/config
 function emptyState() {
   return { settings: { company: '', signature: '', stripe: '' }, quotes: [] };
 }
@@ -116,6 +117,7 @@ function show(view) {
   $('#onboard').hidden = view !== 'onboard';
   $('#app').hidden = view !== 'app';
   $('#admin').hidden = view !== 'admin';
+  $('#legal').hidden = view !== 'legal';
   window.scrollTo(0, 0);
 }
 async function enterLive() {
@@ -165,6 +167,28 @@ function tab(id) {
 /* data-tab géré par délégation (éléments dynamiques inclus) — voir listener global. */
 
 /* ---------- Authentification ---------- */
+/* ---------- Pages légales (publiques) ---------- */
+const LEGAL_PATHS = { '/mentions-legales': 'legal-mentions', '/cgv': 'legal-cgv', '/confidentialite': 'legal-privacy' };
+function showLegal(path) {
+  const article = LEGAL_PATHS[path];
+  if (!article) return false;
+  show('legal');
+  for (const id of Object.values(LEGAL_PATHS)) $('#' + id).hidden = id !== article;
+  $$('.legal-nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === path));
+  if (location.pathname !== path) history.pushState(null, '', path);
+  document.title = 'DevisPilot — ' + ({ mentions: 'Mentions légales', cgv: 'CGV', confidentialite: 'Confidentialité' })[path === '/mentions-legales' ? 'mentions' : path === '/cgv' ? 'cgv' : 'confidentialite'];
+  return true;
+}
+// Remplit les informations légales injectées au build (jamais codées en dur).
+function fillLegal() {
+  const L = window.DP_LEGAL || {};
+  $$('[data-legal]').forEach(el => { el.textContent = L[el.dataset.legal] || '—'; });
+  $$('[data-legal-email]').forEach(el => { el.href = `mailto:${L.email || ''}`; });
+  $$('[data-legal-version]').forEach(el => { el.textContent = cgvVersion || '—'; });
+  $('#legal-warn').hidden = !(window.DP_LEGAL_MISSING?.length);
+}
+$('[data-legal-back]').onclick = () => { location.href = '/'; };
+
 const authForms = ['login-form', 'signup-form', 'forgot-form', 'reset-form', 'verify-note'];
 function showAuthForm(id) {
   authForms.forEach(f => { $('#' + f).hidden = f !== id; });
@@ -231,7 +255,15 @@ $('#signup-form').onsubmit = async e => {
     name: f.elements.name.value.trim(),
     email: f.elements.email.value.trim(),
     password: f.elements.password.value,
+    cgvAccepted: true,
+    cgvVersion,
   };
+  const cgvErr = $('#err-cgv');
+  cgvErr.hidden = true;
+  if (!$('#s-cgv').checked) {
+    cgvErr.hidden = false; cgvErr.textContent = 'Acceptez les CGV pour créer votre compte.';
+    unbusy(); return;
+  }
   if (payload.password.length < 12) { err.hidden = false; err.textContent = 'Mot de passe : 12 caractères minimum.'; unbusy(); return; }
   try {
     await api('/auth/sign-up/email', { method: 'POST', body: payload });
@@ -391,6 +423,8 @@ function render() {
   $('#top-avatar').textContent = initials(session?.user?.name || state.settings.company);
   $('#user-menu-email').textContent = session?.user?.email || '';
   $('#menu-admin').hidden = !session?.admin;
+  // CGV : version courante non acceptée → bandeau jusqu'à acceptation.
+  if (session?.user && session.cgv_current === false) showCgvBanner();
 }
 
 /* ---------- Table + cartes ---------- */
@@ -473,6 +507,7 @@ document.addEventListener('click', e => {
   const adminAct = e.target.closest('[data-admin-act]');
   const subscribe = e.target.closest('[data-subscribe]');
   const portalBtn = e.target.closest('[data-portal]');
+  const legalLink = e.target.closest('a[href^="/"]');
   if (edit) editQuote(edit.dataset.edit);
   if (compose) composeQuote(compose.dataset.compose);
   if (close) close.closest('dialog')?.close();
@@ -481,6 +516,10 @@ document.addEventListener('click', e => {
   if (adminAct) adminAction(adminAct.dataset.adminAct, adminAct.dataset.id, adminAct.dataset.email, adminAct);
   if (subscribe) billingSubscribe(subscribe.dataset.subscribe, subscribe);
   if (portalBtn) billingPortal(portalBtn);
+  if (legalLink && LEGAL_PATHS[new URL(legalLink.href).pathname]) {
+    e.preventDefault();
+    showLegal(new URL(legalLink.href).pathname);
+  }
 });
 
 /* ---------- Validation de champs ---------- */
@@ -692,6 +731,8 @@ async function loadBilling() {
       html += (b.prices || []).map(p =>
         `<button class="btn btn-primary btn-sm" data-subscribe="${p.id}">${labels[p.key] ?? p.key} — ${fmtPrice(p.amount_cents)}${p.interval === 'year' ? '/an' : '/mois'}</button>`).join('')
         || '<p class="form-intro">Aucune offre configurée.</p>';
+      const vat = window.DP_LEGAL?.vatMention;
+      html += `<p class="sub-meta">Prix affichés sans TVA${vat ? ` · ${esc(vat)}` : ''}. Paiement sécurisé par Stripe.</p>`;
     }
     if (b.hasCustomer)
       html += `<button class="btn btn-quiet btn-sm" data-portal>${paid ? 'Gérer mon abonnement' : 'Portail de facturation'}<svg class="icon"><use href="#i-arrow"/></svg></button>`;
@@ -707,8 +748,27 @@ async function billingSubscribe(priceId, btn) {
   try {
     const { url } = await api('/billing/checkout', { method: 'POST', body: { priceId } });
     window.location.href = url;
-  } catch (e) { toast(e.message, 'error'); unbusy(); }
+  } catch (e) {
+    if (e.code === 'CGV_REQUIRED') { showCgvBanner(); toast(e.message, 'error'); }
+    else toast(e.message, 'error');
+    unbusy();
+  }
 }
+
+/* ---------- Bandeau CGV (ré-acceptation après mise à jour) ---------- */
+function showCgvBanner() {
+  $('#cgv-version-label').textContent = cgvVersion;
+  $('#cgv-banner').hidden = false;
+}
+$('#cgv-accept').onclick = async e => {
+  const unbusy = busy(e.target);
+  try {
+    await api('/legal/accept', { method: 'POST', body: { version: cgvVersion } });
+    $('#cgv-banner').hidden = true;
+    toast('CGV acceptées, merci.');
+  } catch (err) { toast(err.message, 'error'); }
+  finally { unbusy(); }
+};
 async function billingPortal(btn) {
   const unbusy = busy(btn);
   try {
@@ -1166,7 +1226,9 @@ $('#csv').onchange = async e => {
   try {
     const c = await api('/config');
     signupEnabled = !!c.signupEnabled;
+    cgvVersion = c.cgvVersion ?? '';
   } catch { signupEnabled = false; }
+  fillLegal();
   $('#auth-tabs').hidden = !signupEnabled;
   $('#tab-signup').hidden = !signupEnabled;
 
@@ -1184,6 +1246,8 @@ $('#csv').onchange = async e => {
   } catch { /* prix non disponibles : « — » affiché */ }
 
   if (resetToken) { showAuth('reset'); return; }
+  // Pages légales : publiques, sans connexion.
+  if (showLegal(location.pathname)) return;
 
   try {
     const me = await api('/me');

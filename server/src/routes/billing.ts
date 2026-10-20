@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type Stripe from 'stripe';
 import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { config } from '../config.js';
@@ -6,6 +7,7 @@ import {
   stripe, stripeEnabled, priceInfo, planForPrice, knownPriceIds, visiblePriceEntries,
   companyBilling, effectivePlan, activeQuoteCount, FREE_ACTIVE_LIMIT,
 } from '../stripe.js';
+import { cgvAccepted } from '../legal.js';
 
 // Abonnement DevisPilot via Stripe. Le webhook est la source de vérité :
 // plan/statut/période sont écrits par les événements, jamais par le client.
@@ -186,6 +188,10 @@ export default async function billingRoutes(app: FastifyInstance) {
     const priceId = String((req.body as any)?.priceId ?? '');
     if (!knownPriceIds().has(priceId))
       return reply.code(400).send({ error: 'Offre inconnue.' });
+    // Souscription = acceptation des CGV de la version courante (app, avant
+    // redirection vers Checkout ; le portail Stripe affiche en plus le lien).
+    if (!(await cgvAccepted(req.userId!)))
+      return reply.code(428).send({ error: 'Acceptez les conditions générales de vente pour souscrire.', code: 'CGV_REQUIRED' });
 
     const b = await companyBilling(req.companyId!);
     let customerId = b.stripe_customer_id;
@@ -200,17 +206,36 @@ export default async function billingRoutes(app: FastifyInstance) {
       await pool.query('UPDATE companies SET stripe_customer_id=$2 WHERE id=$1', [req.companyId, customerId]);
     }
 
-    const session = await s.checkout.sessions.create({
+    const params: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
+      // Aucune TVA collectée (franchise, art. 293 B CGI) : pas d'automatic_tax.
       client_reference_id: req.companyId,
       metadata: { company_id: req.companyId! },
       subscription_data: { metadata: { company_id: req.companyId! } },
+      // Case « j'accepte les CGV » sur la page Checkout (si le compte Stripe l'autorise).
+      consent_collection: { terms_of_service: 'required' },
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: `En souscrivant, j'accepte les conditions générales de vente : ${config.frontUrl}/cgv`,
+        },
+      },
       success_url: `${config.frontUrl}/?billing=success`,
       cancel_url: `${config.frontUrl}/?billing=cancel`,
-    });
+    };
+    let session;
+    try {
+      session = await s.checkout.sessions.create(params);
+    } catch (err) {
+      // Certains comptes ne permettent pas consent_collection : l'acceptation
+      // reste garantie par le garde CGV en amont (dans l'app).
+      if (!/terms_of_service|consent_collection|custom_text/i.test(String((err as any)?.message))) throw err;
+      delete params.consent_collection; delete params.custom_text;
+      req.log.warn('stripe: consent_collection indisponible, checkout sans case CGV');
+      session = await s.checkout.sessions.create(params);
+    }
     return { url: session.url };
   });
 
