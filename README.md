@@ -5,7 +5,7 @@ Frontend HTML/CSS/JavaScript buildless (sources `public/`, build minimal `npm ru
 
 ## Architecture
 
-- `public/` — frontend statique. Servi par l'API en auto-hébergement (même origine, cookies HttpOnly) ou déployé sur Vercel (`dist/` généré, `config.js` injecte `VITE_API_URL` → cookies cross-site SameSite=None;Secure + CORS).
+- `public/` — frontend statique. Servi par l'API en auto-hébergement (même origine, cookies HttpOnly) ou déployé sur Vercel (`dist/` généré, `config.js` injecte `VITE_API_URL` → CORS avec credentials + cookie `SameSite=Lax` : le front sur `<domaine>`/`www.<domaine>` et l'API sur `api.<domaine>` forment le **même site**, donc `Lax` suffit et n'est pas bloqué par Safari/Firefox. `COOKIE_SAMESITE=none` n'est utile que pour tester depuis une origine d'un autre site (`*.vercel.app`) — peut échouer sur Safari. Cookie host-only : pas d'attribut `Domain` sauf `COOKIE_DOMAIN` explicite).
 - `server/` — API Fastify : Better Auth (sessions serveur en base, révocables), isolation par entreprise via `memberships`, protection CSRF (en-tête `x-devispilot-client` + contrôle d'origine), rate-limit, montants en centimes, relances atomiques et idempotentes.
 - `server/migrations/` — schéma versionné, appliqué automatiquement au démarrage.
 - `docker-compose.yml` — PostgreSQL privé (aucun port publié) + API publiée sur `127.0.0.1:${API_PORT}` pour cloudflared hôte.

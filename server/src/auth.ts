@@ -19,13 +19,16 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,           // glissement quotidien
   },
   advanced: {
-    useSecureCookies: config.cookieSecure || config.crossSite,
+    useSecureCookies: config.cookieSecure || config.cookieSameSite === 'none',
     cookiePrefix: 'dp',
-    // Front sur une autre origine (ex. Vercel ↔ api.<domaine>) : SameSite=None
-    // est requis pour que le cookie de session soit envoyé (HTTPS obligatoire).
-    ...(config.crossSite
-      ? { defaultCookieAttributes: { sameSite: 'none' as const, secure: true, httpOnly: true } }
-      : {}),
+    // Lax en prod (même site, sous-domaines), None seulement via COOKIE_SAMESITE.
+    // Aucun Domain sans COOKIE_DOMAIN : cookie host-only sur l'API.
+    defaultCookieAttributes: {
+      sameSite: config.cookieSameSite,
+      secure: config.cookieSecure || config.cookieSameSite === 'none',
+      httpOnly: true,
+      ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
+    },
     // Inscription publique bloquée aussi côté route (voir routes/auth.ts).
     disableCSRFCheck: false,
     database: {

@@ -23,9 +23,13 @@ export const config = {
   databaseUrl: req('DATABASE_URL', 'postgres://devispilot:devispilot@127.0.0.1:5432/devispilot'),
   baseUrl,
   corsOrigins,
-  // Front sur une autre origine (Vercel ↔ api.<domaine>) : cookies cross-site
-  // obligatoirement SameSite=None + Secure (HTTPS requis).
-  crossSite: corsOrigins.length > 0,
+  // SameSite=Lax par défaut : front sur <domaine>/www + API sur api.<domaine>
+  // sont le MÊME site (même domaine enregistrable) → Lax suffit et n'est pas
+  // bloqué comme cookie tiers par Safari/Firefox. 'none' uniquement pour les
+  // tests sur des origines d'un autre site (ex. *.vercel.app).
+  cookieSameSite: (process.env.COOKIE_SAMESITE ?? 'lax') === 'none' ? 'none' as const : 'lax' as const,
+  // Pas d'attribut Domain par défaut : cookie host-only sur api.<domaine>.
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   // Inscription publique : activée en dev, à garder désactivée en production
   // tant que la vérification d'email n'est pas opérationnelle.
   signupEnabled: process.env.SIGNUP_ENABLED ? process.env.SIGNUP_ENABLED === 'true' : !isProd,

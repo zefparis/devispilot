@@ -34,6 +34,8 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?définir dans .env}
       BASE_URL: ${BASE_URL:-http://127.0.0.1:3400}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
       TRUST_PROXY: ${TRUST_PROXY:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
