@@ -47,7 +47,11 @@ SMTP_PASS=<mot-de-passe-smtp>
 MAIL_FROM=DevisPilot <noreply@<domaine>>
 
 SIGNUP_ENABLED=true                          # inscription libre une fois SMTP actif ;
-                                              # false = comptes sur invitation seulement
+                                              # l'interrupteur du back-office est
+                                              # prioritaire sur cette valeur
+
+ADMIN_EMAILS=votre-email@<domaine>           # accès back-office /admin — liste
+                                              # d'emails séparés par des virgules
 ```
 
 `BASE_URL` en https active automatiquement les cookies `Secure`. `TRUST_PROXY=true`
@@ -83,9 +87,21 @@ est refusée (503) plutôt que de créer un compte bloqué.
 - `SIGNUP_ENABLED=true` : les clients s'inscrivent seuls (email de vérification,
   24 h ; mot de passe ≥ 12 caractères ; nom + nom d'entreprise demandés au signup,
   entreprise créée à la première connexion).
-- `SIGNUP_ENABLED=false` : créer les comptes en ouvrant temporairement
-  (`SIGNUP_ENABLED=true docker compose up -d api`, créer le compte, repasser à
-  `false`). Le compte devra quand même cliquer le lien de vérification reçu.
+- `SIGNUP_ENABLED=false` : créer les comptes depuis le back-office `/admin`
+  (formulaire « Créer un compte client » — le client reçoit un email pour
+  définir son mot de passe). L'interrupteur d'inscription du back-office,
+  stocké en base, est prioritaire sur `SIGNUP_ENABLED` : il se règle aussi
+  depuis `/admin`.
+
+## Back-office administrateur
+
+Accessible sur `https://<domaine>/admin` pour les comptes dont l'email figure
+dans `ADMIN_EMAILS` (email vérifié requis). Fonctions : tableau de bord
+(entrprises, utilisateurs, inscriptions 7/30 j, non vérifiés, devis), liste des
+entreprises et des utilisateurs (recherche/tri), suspension/réactivation,
+révocation de sessions, suppression de compte, interrupteur d'inscription,
+création de compte par invitation et journal d'audit. L'administrateur ne voit
+que des métadonnées — jamais le contenu des devis ni des clients finaux.
 
 ## 4. Sauvegardes
 

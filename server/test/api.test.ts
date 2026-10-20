@@ -9,6 +9,7 @@ process.env.BASE_URL = 'http://localhost:3410';
 process.env.BETTER_AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
 process.env.NODE_ENV = 'test';
 process.env.RATE_LIMIT_AUTH_MAX = '1000';
+process.env.ADMIN_EMAILS = 'admin@devispilot.test';
 // Driver email de test : capture en mémoire, aucun réseau.
 process.env.SMTP_HOST = 'log';
 process.env.MAIL_FROM = 'DevisPilot Test <test@devispilot.local>';
@@ -289,4 +290,170 @@ test('sessions : liste, révocation', async () => {
   assert.equal(rev.statusCode, 200);
   const me = await app.inject({ method: 'GET', url: '/api/me', headers: { cookie: c2 } });
   assert.equal(me.statusCode, 401, 'session révoquée');
+});
+
+/* ---------- Back-office administrateur ---------- */
+const ADMIN_COOKIE = () => signup('admin@devispilot.test', 'Admin');
+
+test('admin : non authentifié → 401, non-admin → 403 sur toutes les routes', async () => {
+  const user = await signup('user-no-admin@x.fr');
+  const checks: Array<{ method: any; url: string }> = [
+    { method: 'GET', url: '/api/admin/stats' },
+    { method: 'GET', url: '/api/admin/companies' },
+    { method: 'GET', url: '/api/admin/users' },
+    { method: 'GET', url: '/api/admin/settings' },
+    { method: 'GET', url: '/api/admin/audit' },
+    { method: 'POST', url: '/api/admin/users/x/verify' },
+    { method: 'POST', url: '/api/admin/users/x/resend-verification' },
+    { method: 'POST', url: '/api/admin/users/x/suspend' },
+    { method: 'POST', url: '/api/admin/users/x/revoke-sessions' },
+    { method: 'DELETE', url: '/api/admin/users/x' },
+    { method: 'PUT', url: '/api/admin/settings' },
+    { method: 'POST', url: '/api/admin/accounts' },
+  ];
+  for (const c of checks) {
+    const anon = await app.inject({ ...c, headers: H, payload: {} });
+    assert.equal(anon.statusCode, 401, `anon ${c.method} ${c.url} → ${anon.statusCode}`);
+    const r = await app.inject({ ...c, headers: { ...H, cookie: user }, payload: {} });
+    assert.equal(r.statusCode, 403, `non-admin ${c.method} ${c.url} → ${r.statusCode} ${r.body}`);
+  }
+});
+
+test('admin : email non vérifié → 403 même si dans ADMIN_EMAILS', async () => {
+  // Vraie session admin, puis email repassé non vérifié en base : le garde refuse.
+  const admin = await ADMIN_COOKIE();
+  await pool.query(`UPDATE "user" SET "emailVerified"=false WHERE email='admin@devispilot.test'`);
+  try {
+    const s = await app.inject({ method: 'GET', url: '/api/admin/stats', headers: { ...H, cookie: admin } });
+    assert.equal(s.statusCode, 403, `admin non vérifié → ${s.statusCode}`);
+  } finally {
+    await pool.query(`UPDATE "user" SET "emailVerified"=true WHERE email='admin@devispilot.test'`);
+  }
+});
+
+test('admin : statistiques et listes — métadonnées uniquement', async () => {
+  const admin = await ADMIN_COOKIE();
+  const client = await signup('client-meta@x.fr');
+  await createCompany(client, 'Clim Surest');
+  const id = await addQuote(client, { client: 'Zéphirin Duparc', project: 'Installation géothermie', notes: 'NOTE SECRETE XYZ' });
+
+  const stats = await app.inject({ method: 'GET', url: '/api/admin/stats', headers: { ...H, cookie: admin } });
+  assert.equal(stats.statusCode, 200);
+  assert.ok(stats.json().companies >= 1 && stats.json().users >= 2 && stats.json().quotes >= 1);
+
+  const co = await app.inject({ method: 'GET', url: '/api/admin/companies?search=surest', headers: { ...H, cookie: admin } });
+  assert.equal(co.statusCode, 200);
+  const body = JSON.stringify(co.json());
+  // Jamais de contenu métier : ni client final, ni projet, ni notes.
+  for (const leak of ['Zéphirin', 'géothermie', 'NOTE SECRETE', 'notes', 'project', 'client'])
+    assert.ok(!body.includes(leak), `fuite de contenu métier dans /admin/companies : ${leak}`);
+  const row = co.json().companies[0];
+  assert.equal(row.name, 'Clim Surest');
+  assert.ok(Number(row.quotes_count) >= 1 && Number(row.users_count) >= 1);
+
+  const us = await app.inject({ method: 'GET', url: '/api/admin/users?search=client-meta', headers: { ...H, cookie: admin } });
+  assert.equal(us.statusCode, 200);
+  const u = us.json().users[0];
+  assert.equal(u.email, 'client-meta@x.fr');
+  assert.equal(u.company_name, 'Clim Surest');
+  assert.equal(u.email_verified, true);
+});
+
+test('admin : suspendre révoque les sessions et bloque la connexion', async () => {
+  const admin = await ADMIN_COOKIE();
+  const client = await signup('suspend-me@x.fr');
+  const { rows } = await pool.query(`SELECT id FROM "user" WHERE email='suspend-me@x.fr'`);
+  const uid = rows[0].id;
+
+  const sus = await app.inject({ method: 'POST', url: `/api/admin/users/${uid}/suspend`, headers: { ...H, cookie: admin }, payload: { suspended: true } });
+  assert.equal(sus.statusCode, 200, sus.body);
+
+  // Session existante : immédiatement révoquée.
+  const q = await app.inject({ method: 'GET', url: '/api/quotes', headers: { ...H, cookie: client } });
+  assert.equal(q.statusCode, 401, `session révoquée → ${q.statusCode}`);
+  // Nouvelle connexion : refusée.
+  const s = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'suspend-me@x.fr', password: PASSWORD } });
+  assert.ok([401, 403].includes(s.statusCode), `sign-in suspendu → ${s.statusCode}`);
+
+  // Réactivation : la connexion fonctionne à nouveau.
+  const re = await app.inject({ method: 'POST', url: `/api/admin/users/${uid}/suspend`, headers: { ...H, cookie: admin }, payload: { suspended: false } });
+  assert.equal(re.statusCode, 200);
+  const s2 = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'suspend-me@x.fr', password: PASSWORD } });
+  assert.equal(s2.statusCode, 200, `sign-in après réactivation → ${s2.statusCode}`);
+});
+
+test('admin : révocation des sessions seules', async () => {
+  const admin = await ADMIN_COOKIE();
+  const client = await signup('revoke-me@x.fr');
+  const { rows } = await pool.query(`SELECT id FROM "user" WHERE email='revoke-me@x.fr'`);
+  const r = await app.inject({ method: 'POST', url: `/api/admin/users/${rows[0].id}/revoke-sessions`, headers: { ...H, cookie: admin }, payload: {} });
+  assert.equal(r.statusCode, 200);
+  const q = await app.inject({ method: 'GET', url: '/api/quotes', headers: { ...H, cookie: client } });
+  assert.equal(q.statusCode, 401);
+});
+
+test('admin : chaque mutation crée une entrée d\'audit', async () => {
+  const admin = await ADMIN_COOKIE();
+  const { rows: before } = await pool.query('SELECT count(*) AS n FROM audit_log');
+  const n0 = Number(before[0].n);
+
+  const victim = await signup('audit-me@x.fr');
+  const { rows } = await pool.query(`SELECT id FROM "user" WHERE email='audit-me@x.fr'`);
+  const uid = rows[0].id;
+
+  const mutations: Array<[string, string, any?]> = [
+    ['POST', `/api/admin/users/${uid}/resend-verification`, {}],
+    ['POST', `/api/admin/users/${uid}/verify`, {}],
+    ['POST', `/api/admin/users/${uid}/suspend`, { suspended: true }],
+    ['POST', `/api/admin/users/${uid}/suspend`, { suspended: false }],
+    ['POST', `/api/admin/users/${uid}/revoke-sessions`, {}],
+    ['PUT', '/api/admin/settings', { signupEnabled: true }],
+    ['POST', '/api/admin/accounts', { email: 'invite-audit@x.fr', name: 'Invité' }],
+    ['DELETE', `/api/admin/users/${uid}`, {}],
+  ];
+  for (const [method, url, payload] of mutations) {
+    const r = await app.inject({ method, url, headers: { ...H, cookie: admin }, payload });
+    assert.ok(r.statusCode === 200, `${method} ${url} → ${r.statusCode} ${r.body}`);
+  }
+  const { rows: after_ } = await pool.query('SELECT count(*) AS n FROM audit_log');
+  assert.equal(Number(after_[0].n), n0 + mutations.length, 'une entrée d\'audit par mutation');
+
+  const view = await app.inject({ method: 'GET', url: '/api/admin/audit', headers: { ...H, cookie: admin } });
+  assert.equal(view.statusCode, 200);
+  const actions = view.json().entries.map((e: any) => e.action);
+  for (const a of ['user.resend-verification', 'user.verify', 'user.suspend', 'user.reactivate', 'user.revoke-sessions', 'settings.signup', 'account.invite', 'user.delete'])
+    assert.ok(actions.includes(a), `audit contient ${a}`);
+});
+
+test('admin : interrupteur d\'inscription en base, prioritaire sur l\'env', async () => {
+  const admin = await ADMIN_COOKIE();
+  const off = await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { ...H, cookie: admin }, payload: { signupEnabled: false } });
+  assert.equal(off.statusCode, 200);
+  const c = await app.inject({ method: 'GET', url: '/api/config' });
+  assert.equal(c.json().signupEnabled, false, 'config publique suit la base');
+  const s = await signupRaw('closed-admin-toggle@x.fr');
+  assert.equal(s.statusCode, 403, `signup refusé → ${s.statusCode}`);
+  const on = await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { ...H, cookie: admin }, payload: { signupEnabled: true } });
+  assert.equal(on.statusCode, 200);
+  const s2 = await signupRaw('reopen-ok@x.fr');
+  assert.equal(s2.statusCode, 200);
+});
+
+test('admin : création manuelle d\'un compte → invitation par email', async () => {
+  const admin = await ADMIN_COOKIE();
+  const r = await app.inject({ method: 'POST', url: '/api/admin/accounts', headers: { ...H, cookie: admin }, payload: { email: 'invite@x.fr', name: 'Invité Test' } });
+  assert.equal(r.statusCode, 200, r.body);
+  // Email d'invitation reçu avec un lien « définir le mot de passe ».
+  const mail = lastMailTo('invite@x.fr', /réinitialisation/i);
+  assert.ok(mail, 'email d\'invitation envoyé');
+  const token = tokenFrom(mail!);
+  assert.ok(token);
+  // Le client définit son mot de passe via le lien.
+  const set = await app.inject({ method: 'POST', url: '/api/auth/reset-password', headers: H, payload: { token, newPassword: 'nouveaumotdepasse1' } });
+  assert.equal(set.statusCode, 200, `reset-password → ${set.body}`);
+  const sign = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: H, payload: { email: 'invite@x.fr', password: 'nouveaumotdepasse1' } });
+  assert.equal(sign.statusCode, 200, 'connexion avec le mot de passe défini');
+  // Doublon refusé.
+  const dup = await app.inject({ method: 'POST', url: '/api/admin/accounts', headers: { ...H, cookie: admin }, payload: { email: 'invite@x.fr', name: 'X' } });
+  assert.equal(dup.statusCode, 409);
 });

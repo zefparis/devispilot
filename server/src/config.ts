@@ -44,6 +44,11 @@ export const config = {
   trustProxy: process.env.TRUST_PROXY !== 'false',
   // Débit /api/auth/* par IP (anti force brute). Surchargeable en test.
   rateLimitAuth: Number(process.env.RATE_LIMIT_AUTH_MAX ?? 30),
+  // Emails autorisés à administrer (back-office /api/admin/*). Env seule,
+  // jamais exposée côté front ni via l'API.
+  adminEmails: new Set(
+    (process.env.ADMIN_EMAILS ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+  ),
   // SMTP pour les emails transactionnels (vérification, reset). Sans SMTP,
   // l'inscription publique est refusée (cf. garde dans app.ts).
   // SMTP_HOST=log → driver de test : emails capturés en mémoire, aucun réseau.

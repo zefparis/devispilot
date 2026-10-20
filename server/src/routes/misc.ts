@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import { requireCompany, requireSession } from '../guards.js';
 import { csvCell } from '../validate.js';
+import { config } from '../config.js';
+import { signupEnabledNow } from '../settings.js';
 
 export default async function miscRoutes(app: FastifyInstance) {
   app.get('/api/health', async () => {
@@ -13,8 +15,9 @@ export default async function miscRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({ status: 'ok' }));
 
   // Configuration publique minimale lue par le frontend au démarrage.
+  // L'interrupteur en base (back-office) est prioritaire sur l'env.
   app.get('/api/config', async () => ({
-    signupEnabled: (app as any).signupEnabled,
+    signupEnabled: await signupEnabledNow(),
   }));
 
   app.get('/api/me', { preHandler: requireSession }, async (req, reply) => {
@@ -24,7 +27,8 @@ export default async function miscRoutes(app: FastifyInstance) {
        WHERE m.user_id = $1 ORDER BY m.created_at LIMIT 1`, [req.userId]);
     const { rows: users } = await pool.query<{ name: string; email: string }>(
       'SELECT name, email FROM "user" WHERE id=$1', [req.userId]);
-    return { user: users[0] ?? null, company: rows[0] ?? null, session_id: req.sessionId };
+    const admin = !!users[0] && config.adminEmails.has(users[0].email.toLowerCase());
+    return { user: users[0] ?? null, company: rows[0] ?? null, session_id: req.sessionId, admin };
   });
 
   // Création de l'entreprise à la première connexion (propriétaire = utilisateur courant).

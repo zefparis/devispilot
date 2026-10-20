@@ -243,6 +243,43 @@ h3 { font-size: 16px; font-weight: 650; }
 .verify-icon .icon { width: 30px; height: 30px; color: var(--green); }
 .verify-icon { margin-bottom: 10px; }
 
+/* --- Back-office --- */
+.admin-main { min-height: 100vh; }
+.admin-wrap {
+  width: 100%; max-width: 1160px; margin: 0 auto;
+  padding: 22px 28px 60px; display: grid; gap: 20px;
+}
+.admin-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.admin-wrap .panel h3 { font-size: 16px; }
+.admin-wrap table td, .admin-wrap table th { font-size: 13px; }
+.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.admin-actions .btn { padding: 6px 10px; font-size: 12px; }
+.badge-suspended {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--danger-soft, #fdecec); color: var(--danger, #b33333);
+  padding: 3px 8px; border-radius: 5px;
+}
+.badge-verified {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--green-soft); color: var(--green);
+  padding: 3px 8px; border-radius: 5px;
+}
+.badge-unverified {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--line, #e8e4da); color: var(--muted);
+  padding: 3px 8px; border-radius: 5px;
+}
+.toggle-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 550; cursor: pointer;
+}
+.toggle-row input { width: 18px; height: 18px; accent-color: var(--green); cursor: pointer; }
+@media (max-width: 900px) {
+  .admin-cols { grid-template-columns: 1fr; }
+  .admin-wrap { padding: 14px 14px 60px; }
+}
+
 /* ---------- Badges de statut ---------- */
 .badge {
   display: inline-flex; align-items: center; gap: 6px;

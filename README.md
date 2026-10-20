@@ -33,6 +33,8 @@ node --check public/app.js
 
 Comptes réels : inscription (email + mot de passe ≥ 12 caractères, `SIGNUP_ENABLED`), **vérification d'email obligatoire** (lien valable 24 h), connexion/déconnexion (erreur générique anti-énumération), **mot de passe oublié** (lien 1 h, usage unique), changement d'email avec re-vérification, changement de mot de passe, sessions listables/révocables, export RGPD en JSON, suppression de compte (confirmation par mot de passe, données liées effacées en cascade). Emails transactionnels via SMTP (`SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`, `FRONT_URL` pour les liens) — sans SMTP configuré l'inscription publique est refusée (log clair au démarrage).
 
+**Back-office exploitant** sur `/admin` : réservé aux emails de `ADMIN_EMAILS` (vérifiés côté serveur à chaque requête, aucun rôle à cocher dans l'UI). Statistiques d'ensemble, listes d'entreprises et d'utilisateurs (recherche/tri, métadonnées uniquement — jamais de contenu de devis), suspension/réactivation avec révocation des sessions, suppression de compte, interrupteur d'inscription stocké en base (prioritaire sur `SIGNUP_ENABLED`), création de compte par invitation par email, journal d'audit de chaque action administrateur.
+
 Métier : création d'entreprise, sessions HttpOnly, devis CRUD, file de relances, confirmation manuelle avec prochaine date (atomique + idempotent), messages déterministes modifiables, import CSV validé (anti-doublon par empreinte), export CSV (BOM, neutralisation de formules), réglages signature + Payment Link validé `buy.stripe.com`, fiche entreprise (raison sociale, SIREN/SIRET, adresse, téléphone, email de contact, logo ≤ 200 Ko). Aucune donnée fictive.
 
 ## Limites (affichées dans le produit)

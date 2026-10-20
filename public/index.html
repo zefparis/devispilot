@@ -351,6 +351,7 @@
           <div class="user-menu-pop" id="user-menu" hidden role="menu">
             <p class="user-menu-id" id="user-menu-email"></p>
             <button class="user-menu-item" data-tab="account" role="menuitem"><svg class="icon"><use href="#i-user"/></svg>Mon compte</button>
+            <button class="user-menu-item" id="menu-admin" role="menuitem" hidden><svg class="icon"><use href="#i-sliders"/></svg>Administration</button>
             <button class="user-menu-item" id="menu-logout" role="menuitem"><svg class="icon"><use href="#i-x"/></svg>Se déconnecter</button>
           </div>
         </div>
@@ -624,6 +625,123 @@
   </nav>
 </section>
 
+<!-- ==================== ADMINISTRATION ==================== -->
+<section id="admin" hidden aria-label="Back-office DevisPilot">
+  <div class="app-main admin-main">
+    <div class="app-top">
+      <span class="crumb">DevisPilot <span aria-hidden="true">/</span> <b>Administration</b></span>
+      <div class="app-top-right">
+        <button class="btn btn-quiet btn-sm" id="admin-back">← Espace client</button>
+      </div>
+    </div>
+
+    <div class="admin-wrap">
+      <div class="stats" id="admin-stats"></div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Entreprises</h3>
+            <p id="admin-companies-count"></p>
+          </div>
+          <div class="tools">
+            <label class="search">
+              <svg class="icon"><use href="#i-search"/></svg>
+              <input id="admin-co-search" placeholder="Rechercher (raison sociale, SIREN)" aria-label="Rechercher une entreprise">
+            </label>
+            <select id="admin-co-sort" aria-label="Trier les entreprises">
+              <option value="created_at">Plus récentes</option>
+              <option value="name">Nom (A→Z)</option>
+              <option value="users">Utilisateurs</option>
+              <option value="quotes">Devis</option>
+              <option value="activity">Dernière activité</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th scope="col">Raison sociale</th><th scope="col">SIREN/SIRET</th>
+              <th scope="col">Créée le</th><th scope="col">Utilisateurs</th>
+              <th scope="col">Devis</th><th scope="col">Dernière activité</th>
+            </tr></thead>
+            <tbody id="admin-companies"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Utilisateurs</h3>
+            <p id="admin-users-count"></p>
+          </div>
+          <div class="tools">
+            <label class="search">
+              <svg class="icon"><use href="#i-search"/></svg>
+              <input id="admin-u-search" placeholder="Rechercher (nom, email)" aria-label="Rechercher un utilisateur">
+            </label>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th scope="col">Utilisateur</th><th scope="col">Entreprise</th>
+              <th scope="col">Email vérifié</th><th scope="col">Inscription</th>
+              <th scope="col">Dernière connexion</th><th scope="col"><span class="sr-only">Actions</span></th>
+            </tr></thead>
+            <tbody id="admin-users"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-cols">
+        <div class="panel form-panel">
+          <h3>Inscriptions</h3>
+          <p class="form-intro">Interrupteur en base — prioritaire sur la variable d'environnement.</p>
+          <label class="toggle-row">
+            <input type="checkbox" id="admin-signup-toggle">
+            <span>Ouvrir l'inscription publique</span>
+          </label>
+          <p class="field-error" id="err-admin-settings" hidden></p>
+        </div>
+
+        <form class="panel form-panel" id="admin-invite-form" novalidate>
+          <h3>Créer un compte client</h3>
+          <p class="form-intro">Le client reçoit un email d'invitation pour définir son mot de passe.</p>
+          <div class="field">
+            <label for="inv-name">Nom</label>
+            <input id="inv-name" name="name" required maxlength="100">
+          </div>
+          <div class="field">
+            <label for="inv-email">Email</label>
+            <input id="inv-email" name="email" type="email" required maxlength="200">
+          </div>
+          <p class="field-error" id="err-invite" hidden></p>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit" id="invite-btn">Créer et envoyer l'invitation</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div><h3>Journal d'audit</h3><p>Actions administrateur récentes (200 dernières).</p></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th scope="col">Date</th><th scope="col">Administrateur</th>
+              <th scope="col">Action</th><th scope="col">Cible</th><th scope="col">IP</th>
+            </tr></thead>
+            <tbody id="admin-audit"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ==================== DIALOGUES ==================== -->
 <dialog id="editor" aria-labelledby="editor-title">
   <form id="quote-form" novalidate>
@@ -745,6 +863,26 @@
   <div class="dialog-footer">
     <button class="btn btn-quiet" data-close>Annuler</button>
     <button class="btn btn-danger" id="delete-account-confirm">Supprimer définitivement</button>
+  </div>
+</dialog>
+
+<dialog id="admin-delete-dlg" aria-labelledby="admin-delete-title">
+  <div class="dialog-head">
+    <div>
+      <p class="eyebrow"><i></i>Action définitive</p>
+      <h2 id="admin-delete-title">Supprimer ce compte&nbsp;?</h2>
+    </div>
+    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <p class="confirm-text">Le compte <strong id="admin-delete-email"></strong>, son entreprise et toutes ses données seront supprimés. Tapez son email pour confirmer.</p>
+  <div class="field">
+    <label for="admin-delete-confirm-email">Email du compte</label>
+    <input id="admin-delete-confirm-email" type="email" autocomplete="off">
+    <p class="field-error" id="err-admin-delete" hidden></p>
+  </div>
+  <div class="dialog-footer">
+    <button class="btn btn-quiet" data-close>Annuler</button>
+    <button class="btn btn-danger" id="admin-delete-confirm">Supprimer définitivement</button>
   </div>
 </dialog>
 

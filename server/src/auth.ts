@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { pool } from './db.js';
 import { config } from './config.js';
 import { sendMail, EMAIL_TEMPLATES } from './mailer.js';
@@ -83,6 +84,18 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [config.baseUrl, ...config.corsOrigins],
+  // Un compte suspendu ne peut plus se connecter.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/sign-in/email') return;
+      const email = String(ctx.body?.email ?? '').toLowerCase();
+      if (!email) return;
+      const { rows } = await pool.query<{ suspended_at: string | null }>(
+        'SELECT suspended_at FROM "user" WHERE lower(email)=$1', [email]);
+      if (rows[0]?.suspended_at)
+        throw new APIError('FORBIDDEN', { message: 'Compte suspendu. Contactez le support.' });
+    }),
+  },
   logger: { level: 'warn' },
 });
 

@@ -10,6 +10,8 @@ import quoteRoutes from './routes/quotes.js';
 import settingsRoutes from './routes/settings.js';
 import importRoutes from './routes/imports.js';
 import profileRoutes from './routes/profile.js';
+import adminRoutes from './routes/admin.js';
+import { signupEnabledNow } from './settings.js';
 import miscRoutes from './routes/misc.js';
 
 export async function buildApp() {
@@ -60,7 +62,8 @@ export async function buildApp() {
     handler: async (req, reply) => {
       const pathname = new URL(req.raw.url ?? '/', 'http://x').pathname;
       if (pathname === '/api/auth/sign-up/email') {
-        if (!config.signupEnabled)
+        // L'interrupteur en base (back-office) est prioritaire sur l'env.
+        if (!(await signupEnabledNow()))
           return reply.code(403).send({ error: 'Les inscriptions sont fermées pour le moment.' });
         // La vérification d'email est obligatoire : sans SMTP, l'inscription
         // créerait un compte inutilisable → on la refuse explicitement.
@@ -94,6 +97,7 @@ export async function buildApp() {
   await app.register(settingsRoutes);
   await app.register(profileRoutes);
   await app.register(importRoutes);
+  await app.register(adminRoutes);
 
   // Frontend statique (même origine que /api) + repli mono-page.
   await app.register(fastifyStatic, { root: config.staticRoot });

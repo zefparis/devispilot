@@ -115,6 +115,7 @@ function show(view) {
   $('#auth').hidden = view !== 'auth';
   $('#onboard').hidden = view !== 'onboard';
   $('#app').hidden = view !== 'app';
+  $('#admin').hidden = view !== 'admin';
   window.scrollTo(0, 0);
 }
 async function enterLive() {
@@ -138,6 +139,8 @@ async function logout() {
 $('#logout').onclick = logout;
 $('#logout-m').onclick = logout;
 $('#menu-logout').onclick = () => { hideMenu(); logout(); };
+$('#menu-admin').onclick = () => { hideMenu(); enterAdmin(); };
+$('#admin-back').onclick = () => { history.replaceState(null, '', '/'); enterLive(); };
 
 /* Menu utilisateur (en-tête) */
 const menuPop = $('#user-menu');
@@ -386,6 +389,7 @@ function render() {
   $('#ws-avatar').textContent = initials(session?.user?.name || state.settings.company);
   $('#top-avatar').textContent = initials(session?.user?.name || state.settings.company);
   $('#user-menu-email').textContent = session?.user?.email || '';
+  $('#menu-admin').hidden = !session?.admin;
   $('#buy').textContent = state.settings.stripe ? 'Accéder au paiement Stripe' : 'Vérifier la disponibilité de l\'offre';
   $('#payment-note').textContent = state.settings.stripe
     ? 'Paiement hébergé par Stripe · vérifiez le récapitulatif'
@@ -469,11 +473,13 @@ document.addEventListener('click', e => {
   const close = e.target.closest('[data-close]');
   const tabBtn = e.target.closest('[data-tab]');
   const revoke = e.target.closest('[data-revoke]');
+  const adminAct = e.target.closest('[data-admin-act]');
   if (edit) editQuote(edit.dataset.edit);
   if (compose) composeQuote(compose.dataset.compose);
   if (close) close.closest('dialog')?.close();
   if (tabBtn) { hideMenu(); tab(tabBtn.dataset.tab); }
   if (revoke) revokeSession(revoke.dataset.revoke);
+  if (adminAct) adminAction(adminAct.dataset.adminAct, adminAct.dataset.id, adminAct.dataset.email, adminAct);
 });
 
 /* ---------- Validation de champs ---------- */
@@ -825,6 +831,165 @@ $('#delete-account-confirm').onclick = async () => {
   } finally { unbusy(); }
 };
 
+/* ---------- Back-office administration ---------- */
+const adminApi = (path, opts) => api('/admin' + path, opts);
+
+async function enterAdmin() {
+  if (!session?.admin) { history.replaceState(null, '', '/'); return; }
+  history.replaceState(null, '', '/admin');
+  show('admin');
+  try {
+    await Promise.all([loadAdminStats(), loadAdminCompanies(), loadAdminUsers(), loadAdminSettings(), loadAdminAudit()]);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function loadAdminStats() {
+  const s = await adminApi('/stats');
+  const cards = [
+    { label: 'Entreprises', value: s.companies },
+    { label: 'Utilisateurs', value: s.users },
+    { label: 'Inscriptions 7 j', value: s.signups7 },
+    { label: 'Inscriptions 30 j', value: s.signups30 },
+    { label: 'Emails non vérifiés', value: s.unverified },
+    { label: 'Comptes suspendus', value: s.suspended },
+    { label: 'Devis enregistrés', value: s.quotes },
+  ];
+  $('#admin-stats').innerHTML = cards.map(c => `<article class="stat">
+    <div class="stat-head">${icon('i-info')}<p>${c.label}</p></div>
+    <strong>${c.value}</strong>
+  </article>`).join('');
+}
+
+async function loadAdminCompanies() {
+  const search = $('#admin-co-search').value.trim();
+  const sort = $('#admin-co-sort').value;
+  const { companies } = await adminApi(`/companies?search=${encodeURIComponent(search)}&sort=${sort}`);
+  $('#admin-companies-count').textContent = `${companies.length} entreprise(s)`;
+  $('#admin-companies').innerHTML = companies.map(c => `<tr>
+    <td><strong>${esc(c.name)}</strong></td>
+    <td>${esc(c.siren || '—')}</td>
+    <td>${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+    <td>${c.users_count}</td>
+    <td>${c.quotes_count}</td>
+    <td>${c.last_activity ? fmtDateTime(c.last_activity) : '—'}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="subtle">Aucune entreprise.</td></tr>';
+}
+let adminSearchTimer;
+$('#admin-co-search').oninput = () => { clearTimeout(adminSearchTimer); adminSearchTimer = setTimeout(loadAdminCompanies, 300); };
+$('#admin-co-sort').onchange = loadAdminCompanies;
+
+async function loadAdminUsers() {
+  const search = $('#admin-u-search').value.trim();
+  const { users } = await adminApi(`/users?search=${encodeURIComponent(search)}`);
+  $('#admin-users-count').textContent = `${users.length} utilisateur(s)`;
+  $('#admin-users').innerHTML = users.map(u => `<tr${u.suspended_at ? ' class="row-suspended"' : ''}>
+    <td><strong>${esc(u.name)}</strong><span class="cell-sub">${esc(u.email)}${u.suspended_at ? ' <span class="badge-suspended">Suspendu</span>' : ''}</span></td>
+    <td>${esc(u.company_name || '—')}</td>
+    <td>${u.email_verified ? '<span class="badge-verified">Vérifié</span>' : '<span class="badge-unverified">Non vérifié</span>'}</td>
+    <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+    <td>${u.last_seen ? fmtDateTime(u.last_seen) : '—'}</td>
+    <td><div class="admin-actions">
+      ${!u.email_verified ? `<button class="btn btn-quiet btn-sm" data-admin-act="verify" data-id="${u.id}" data-email="${esc(u.email)}">Forcer vérif.</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="resend" data-id="${u.id}" data-email="${esc(u.email)}">Renvoyer l'email</button>` : ''}
+      <button class="btn btn-quiet btn-sm" data-admin-act="${u.suspended_at ? 'reactivate' : 'suspend'}" data-id="${u.id}" data-email="${esc(u.email)}">${u.suspended_at ? 'Réactiver' : 'Suspendre'}</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="revoke" data-id="${u.id}" data-email="${esc(u.email)}">Révoquer sessions</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="delete" data-id="${u.id}" data-email="${esc(u.email)}">Supprimer</button>
+    </div></td>
+  </tr>`).join('') || '<tr><td colspan="6" class="subtle">Aucun utilisateur.</td></tr>';
+}
+let adminUSearchTimer;
+$('#admin-u-search').oninput = () => { clearTimeout(adminUSearchTimer); adminUSearchTimer = setTimeout(loadAdminUsers, 300); };
+
+async function loadAdminSettings() {
+  const s = await adminApi('/settings');
+  $('#admin-signup-toggle').checked = !!s.signupEnabled;
+}
+$('#admin-signup-toggle').onchange = async e => {
+  try {
+    await adminApi('/settings', { method: 'PUT', body: { signupEnabled: e.target.checked } });
+    toast(`Inscription publique ${e.target.checked ? 'ouverte' : 'fermée'}.`, 'info');
+  } catch (err) {
+    e.target.checked = !e.target.checked;
+    toast(err.message, 'error');
+  }
+};
+
+$('#admin-invite-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#invite-btn')), err = $('#err-invite');
+  err.hidden = true;
+  try {
+    await adminApi('/accounts', { method: 'POST', body: {
+      email: f.elements.email.value.trim(), name: f.elements.name.value.trim(),
+    } });
+    f.reset();
+    toast('Compte créé. Email d\'invitation envoyé.');
+    loadAdminUsers();
+  } catch (err2) { err.hidden = false; err.textContent = err2.message || 'Création impossible.'; }
+  finally { unbusy(); }
+};
+
+async function loadAdminAudit() {
+  const { entries } = await adminApi('/audit');
+  $('#admin-audit').innerHTML = entries.map(en => `<tr>
+    <td>${fmtDateTime(en.created_at)}</td>
+    <td>${esc(en.admin_email)}</td>
+    <td><strong>${esc(en.action)}</strong></td>
+    <td>${esc([en.target_type, en.target_id].filter(Boolean).join(' · ') || '—')}</td>
+    <td>${esc(en.ip || '—')}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="subtle">Aucune action enregistrée.</td></tr>';
+}
+
+let adminDeleteTarget = null;
+async function adminAction(act, id, email) {
+  const done = msg => { toast(msg, 'info'); Promise.all([loadAdminUsers(), loadAdminAudit(), loadAdminStats()]).catch(() => {}); };
+  try {
+    switch (act) {
+      case 'verify':
+        if (!await askConfirm('Forcer la vérification ?', `L'email de ${email} sera marqué vérifié.`, 'Forcer')) return;
+        await adminApi(`/users/${id}/verify`, { method: 'POST', body: {} });
+        return done('Email marqué vérifié.');
+      case 'resend':
+        await adminApi(`/users/${id}/resend-verification`, { method: 'POST', body: {} });
+        return done('Email de vérification renvoyé.');
+      case 'suspend':
+        if (!await askConfirm('Suspendre ce compte ?', `${email} ne pourra plus se connecter et toutes ses sessions seront révoquées.`, 'Suspendre')) return;
+        await adminApi(`/users/${id}/suspend`, { method: 'POST', body: { suspended: true } });
+        return done('Compte suspendu.');
+      case 'reactivate':
+        await adminApi(`/users/${id}/suspend`, { method: 'POST', body: { suspended: false } });
+        return done('Compte réactivé.');
+      case 'revoke':
+        if (!await askConfirm('Révoquer les sessions ?', `Toutes les sessions de ${email} seront fermées.`, 'Révoquer')) return;
+        await adminApi(`/users/${id}/revoke-sessions`, { method: 'POST', body: {} });
+        return done('Sessions révoquées.');
+      case 'delete':
+        adminDeleteTarget = { id, email };
+        $('#admin-delete-email').textContent = email;
+        $('#admin-delete-confirm-email').value = '';
+        $('#err-admin-delete').hidden = true;
+        $('#admin-delete-dlg').showModal();
+        return;
+    }
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+$('#admin-delete-confirm').onclick = async () => {
+  const err = $('#err-admin-delete'), unbusy = busy($('#admin-delete-confirm'));
+  err.hidden = true;
+  const typed = $('#admin-delete-confirm-email').value.trim().toLowerCase();
+  if (typed !== adminDeleteTarget?.email?.toLowerCase()) {
+    err.hidden = false; err.textContent = 'L\'email saisi ne correspond pas.'; unbusy(); return;
+  }
+  try {
+    await adminApi(`/users/${adminDeleteTarget.id}`, { method: 'DELETE' });
+    $('#admin-delete-dlg').close();
+    toast('Compte supprimé.', 'info');
+    Promise.all([loadAdminUsers(), loadAdminAudit(), loadAdminStats()]).catch(() => {});
+  } catch (err2) { err.hidden = false; err.textContent = err2.message || 'Suppression impossible.'; }
+  finally { unbusy(); }
+};
+
 /* ---------- CSV ---------- */
 function csvCell(x) {
   let s = String(x ?? '');
@@ -929,7 +1094,12 @@ $('#csv').onchange = async e => {
     const me = await api('/me');
     if (me?.user) {
       session = me;
-      if (me.company) { mode = 'live'; await refresh(); render(); }
+      if (me.company) {
+        mode = 'live'; await refresh(); render();
+        // Route directe /admin : réservée aux superadmins (ADMIN_EMAILS côté API).
+        if (location.pathname === '/admin' && me.admin) { enterAdmin(); return; }
+        if (location.pathname === '/admin') history.replaceState(null, '', '/');
+      }
       else {
         // Nom d'entreprise saisi à l'inscription, conservé en sessionStorage.
         const pending = sessionStorage.getItem('dp-pending-company');
