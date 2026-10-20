@@ -36,7 +36,11 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+      # Back-office /admin : liste d'emails séparés par des virgules.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-30}
       TRUST_PROXY: ${TRUST_PROXY:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # Emails transactionnels (vérification, reset) — requis pour l'inscription.
