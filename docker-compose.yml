@@ -51,6 +51,14 @@ services:
       MAIL_FROM: ${MAIL_FROM:-DevisPilot <noreply@localhost>}
       # Origine du frontend pour les liens envoyés par email.
       FRONT_URL: ${FRONT_URL:-}
+      # Abonnement Stripe (Checkout + Portail + webhook signé).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PORTAL_RETURN_URL: ${STRIPE_PORTAL_RETURN_URL:-}
+      STRIPE_PRICE_PRO_MONTHLY: ${STRIPE_PRICE_PRO_MONTHLY:-}
+      STRIPE_PRICE_PRO_YEARLY: ${STRIPE_PRICE_PRO_YEARLY:-}
+      STRIPE_PRICE_TEAM_MONTHLY: ${STRIPE_PRICE_TEAM_MONTHLY:-}
+      STRIPE_PRICE_TEAM_YEARLY: ${STRIPE_PRICE_TEAM_YEARLY:-}
     ports:
       # Loopback uniquement : le tunnel cloudflared tourne sur l'hôte X3.
       - "127.0.0.1:${API_PORT:-3400}:3400"

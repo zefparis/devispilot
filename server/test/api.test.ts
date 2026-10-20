@@ -1,5 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import Stripe from 'stripe';
 
 // Base de test dédiée (créée au préalable : CREATE DATABASE devispilot_test).
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
@@ -13,6 +14,13 @@ process.env.ADMIN_EMAILS = 'admin@devispilot.test';
 // Driver email de test : capture en mémoire, aucun réseau.
 process.env.SMTP_HOST = 'log';
 process.env.MAIL_FROM = 'DevisPilot Test <test@devispilot.local>';
+// Stripe en mode test : clés factices, signature calculée localement.
+process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_testsecret';
+process.env.STRIPE_PRICE_PRO_MONTHLY = 'price_pro_m';
+process.env.STRIPE_PRICE_PRO_YEARLY = 'price_pro_y';
+process.env.STRIPE_PRICE_TEAM_MONTHLY = 'price_team_m';
+process.env.STRIPE_PRICE_TEAM_YEARLY = 'price_team_y';
 
 const { buildApp } = await import('../src/app.js');
 const { migrate, pool } = await import('../src/db.js');
@@ -200,7 +208,7 @@ test('import idempotent (CSV/local parsé côté client, historiques importés)'
     ],
   };
   const r1 = await app.inject({ method: 'POST', url: '/api/import', headers: { ...H, cookie }, payload });
-  assert.deepEqual(r1.json(), { imported: 2, skipped: 0, errors: [{ index: 2, error: 'Client invalide (1 à 100 caractères).' }] });
+  assert.deepEqual(r1.json(), { imported: 2, skipped: 0, limited: 0, errors: [{ index: 2, error: 'Client invalide (1 à 100 caractères).' }] });
   const r2 = await app.inject({ method: 'POST', url: '/api/import', headers: { ...H, cookie }, payload });
   assert.equal(r2.json().imported, 0);
   assert.equal(r2.json().skipped, 2);
@@ -456,4 +464,102 @@ test('admin : création manuelle d\'un compte → invitation par email', async (
   // Doublon refusé.
   const dup = await app.inject({ method: 'POST', url: '/api/admin/accounts', headers: { ...H, cookie: admin }, payload: { email: 'invite@x.fr', name: 'X' } });
   assert.equal(dup.statusCode, 409);
+});
+
+/* ---------- Abonnement Stripe ---------- */
+const stripeClient = new Stripe('sk_test_fake');
+const WH_SECRET = 'whsec_testsecret';
+function whReq(event: object) {
+  const payload = JSON.stringify(event);
+  return {
+    payload,
+    headers: {
+      'content-type': 'application/json',
+      host: 'localhost:3410',
+      'stripe-signature': stripeClient.webhooks.generateTestHeaderString({ payload, secret: WH_SECRET }),
+    } as Record<string, string>,
+  };
+}
+const ACTIVE_QUOTE = { client: 'Q', project: 'P', amount: 100, sent: '2026-10-01', next: '2026-10-20', status: 'sent' };
+
+test('stripe : signature invalide → 400, signature absente → 400', async () => {
+  const bad = await app.inject({
+    method: 'POST', url: '/api/stripe/webhook',
+    headers: { 'content-type': 'application/json', 'stripe-signature': 't=1,v1=faux', host: 'localhost:3410' },
+    payload: '{}',
+  });
+  assert.equal(bad.statusCode, 400);
+  const none = await app.inject({
+    method: 'POST', url: '/api/stripe/webhook',
+    headers: { 'content-type': 'application/json', host: 'localhost:3410' },
+    payload: '{}',
+  });
+  assert.equal(none.statusCode, 400);
+});
+
+test('abonnement : limite Gratuit serveur → Pro illimité → past_due conserve → résiliation revient à Gratuit', async () => {
+  const cookie = await signup('quota@x.fr'); await createCompany(cookie, 'QuotaCo');
+  for (let i = 0; i < 10; i++) await addQuote(cookie, { client: `C${i}` });
+  const over = await app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: ACTIVE_QUOTE });
+  assert.equal(over.statusCode, 403, `11e devis → ${over.statusCode}`);
+  assert.equal(over.json().code, 'PLAN_LIMIT');
+  // Un devis signé ne compte pas : création possible en statut won.
+  const won = await app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: { ...ACTIVE_QUOTE, status: 'won' } });
+  assert.equal(won.statusCode, 201, 'devis signé hors quota');
+
+  const { rows } = await pool.query(`SELECT id FROM companies WHERE name='QuotaCo'`);
+  const cid = rows[0].id;
+  await pool.query('UPDATE companies SET stripe_customer_id=$1 WHERE id=$2', ['cus_quota', cid]);
+
+  // Passage Pro via webhook signé (payload seul, aucun appel réseau).
+  const sub = {
+    id: 'sub_quota', customer: 'cus_quota', status: 'active',
+    cancel_at_period_end: false, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400,
+    metadata: {}, items: { data: [{ price: { id: 'price_pro_m' } }] },
+  };
+  const ev = { id: 'evt_sub_quota_1', type: 'customer.subscription.updated', data: { object: sub } };
+  const w1 = await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(ev) });
+  assert.equal(w1.statusCode, 200, w1.body);
+  // Rejoué : traité une seule fois.
+  const w2 = await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(ev) });
+  assert.equal(w2.json().duplicate, true);
+  const { rows: evCount } = await pool.query(`SELECT count(*) AS n FROM stripe_events WHERE event_id='evt_sub_quota_1'`);
+  assert.equal(Number(evCount[0].n), 1);
+
+  const { rows: co } = await pool.query('SELECT plan, subscription_status FROM companies WHERE id=$1', [cid]);
+  assert.equal(co[0].plan, 'pro');
+  assert.equal(co[0].subscription_status, 'active');
+  const ok = await app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: ACTIVE_QUOTE });
+  assert.equal(ok.statusCode, 201, 'Pro : limite levée');
+
+  // Échec de paiement : past_due, accès conservé pendant la relance Stripe.
+  const fail = { id: 'evt_inv_fail_1', type: 'invoice.payment_failed', data: { object: { customer: 'cus_quota' } } };
+  await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(fail) });
+  const still = await app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: ACTIVE_QUOTE });
+  assert.equal(still.statusCode, 201, 'accès conservé en past_due');
+
+  // Résiliation : retour Gratuit, aucune donnée supprimée.
+  const del = { id: 'evt_sub_del_1', type: 'customer.subscription.deleted', data: { object: { id: 'sub_quota', customer: 'cus_quota', metadata: {} } } };
+  await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(del) });
+  const { rows: co2 } = await pool.query('SELECT plan, subscription_status FROM companies WHERE id=$1', [cid]);
+  assert.equal(co2[0].plan, 'free');
+  assert.equal(co2[0].subscription_status, 'canceled');
+  const blocked = await app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: ACTIVE_QUOTE });
+  assert.equal(blocked.statusCode, 403, 'retour Gratuit : création bloquée');
+  const { rows: kept } = await pool.query('SELECT count(*) AS n FROM quotes WHERE company_id=$1', [cid]);
+  assert.equal(Number(kept[0].n), 13, 'devis conservés après retour Gratuit');
+});
+
+test('billing : état d\'abonnement exposé à l\'entreprise courante', async () => {
+  const cookie = await signup('billing-view@x.fr'); await createCompany(cookie, 'ViewCo');
+  const b = await app.inject({ method: 'GET', url: '/api/billing', headers: { ...H, cookie } });
+  assert.equal(b.statusCode, 200);
+  const j = b.json();
+  assert.equal(j.plan, 'free');
+  assert.equal(j.usage.limit, 10);
+  assert.ok(Array.isArray(j.prices), 'offres listées pour un compte Gratuit');
+  // L'endpoint public de prix est accessible sans session.
+  const p = await app.inject({ method: 'GET', url: '/api/billing/prices' });
+  assert.equal(p.statusCode, 200);
+  assert.equal(p.json().prices.length, 4);
 });

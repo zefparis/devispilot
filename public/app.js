@@ -158,6 +158,7 @@ function tab(id) {
   $$('.nav-item[data-tab], .mobile-item[data-tab], .user-menu-item[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === id));
   $('#breadcrumb').textContent = tabNames[id];
   if (id === 'account') loadAccount();
+  if (id === 'settings') loadBilling();
   render();
   window.scrollTo(0, 0);
 }
@@ -390,10 +391,6 @@ function render() {
   $('#top-avatar').textContent = initials(session?.user?.name || state.settings.company);
   $('#user-menu-email').textContent = session?.user?.email || '';
   $('#menu-admin').hidden = !session?.admin;
-  $('#buy').textContent = state.settings.stripe ? 'Accéder au paiement Stripe' : 'Vérifier la disponibilité de l\'offre';
-  $('#payment-note').textContent = state.settings.stripe
-    ? 'Paiement hébergé par Stripe · vérifiez le récapitulatif'
-    : 'Paiement non configuré · aucun prélèvement';
 }
 
 /* ---------- Table + cartes ---------- */
@@ -474,12 +471,16 @@ document.addEventListener('click', e => {
   const tabBtn = e.target.closest('[data-tab]');
   const revoke = e.target.closest('[data-revoke]');
   const adminAct = e.target.closest('[data-admin-act]');
+  const subscribe = e.target.closest('[data-subscribe]');
+  const portalBtn = e.target.closest('[data-portal]');
   if (edit) editQuote(edit.dataset.edit);
   if (compose) composeQuote(compose.dataset.compose);
   if (close) close.closest('dialog')?.close();
   if (tabBtn) { hideMenu(); tab(tabBtn.dataset.tab); }
   if (revoke) revokeSession(revoke.dataset.revoke);
   if (adminAct) adminAction(adminAct.dataset.adminAct, adminAct.dataset.id, adminAct.dataset.email, adminAct);
+  if (subscribe) billingSubscribe(subscribe.dataset.subscribe, subscribe);
+  if (portalBtn) billingPortal(portalBtn);
 });
 
 /* ---------- Validation de champs ---------- */
@@ -541,9 +542,19 @@ $('#quote-form').onsubmit = async e => {
     render();
     toast(old ? 'Devis mis à jour.' : 'Devis enregistré.');
   } catch (err) {
+    if (err.code === 'PLAN_LIMIT') {
+      // Limite de l'offre Gratuit : message clair + porte de sortie vers Pro.
+      $('#plan-limit-text').textContent = err.message;
+      $('#plan-limit-note').hidden = false;
+    }
     toast(err.message || 'Enregistrement impossible.', 'error');
     // La boîte reste ouverte : la saisie est conservée.
   } finally { unbusy(); }
+};
+$('#plan-limit-upgrade').onclick = () => {
+  $('#plan-limit-note').hidden = true;
+  $('#editor').close();
+  tab('settings');
 };
 
 $('#delete').onclick = async () => {
@@ -638,11 +649,73 @@ $('#settings-form').addEventListener('input', e => {
   const err = $(`#err-${e.target.name}`);
   if (err && !err.hidden) setErr(e.target, err, '');
 });
-$('#buy').onclick = () => {
-  if (state.settings.stripe) window.open(state.settings.stripe, '_blank', 'noopener,noreferrer');
-  else if (mode === 'live') { tab('settings'); toast('Configurez le lien de paiement dans les paramètres.', 'info'); }
-  else showAuth('login');
+/* ---------- Abonnement ---------- */
+const PLAN_NAMES = { free: 'Gratuit', pro: 'Pro', team: 'Équipe' };
+const STATUS_TXT = {
+  active: 'Abonnement actif', trialing: 'Période d\'essai',
+  past_due: 'Paiement en échec — Stripe retente le prélèvement',
+  canceled: 'Abonnement résilié', unpaid: 'Impayé',
 };
+const fmtPrice = c => c == null ? '—' : (c / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' €';
+
+async function loadBilling() {
+  const panel = $('#sub-panel'), body = $('#sub-body');
+  if (mode !== 'live') return;
+  panel.hidden = false;
+  body.innerHTML = '<p class="form-intro">Chargement…</p>';
+  try {
+    const b = await api('/billing');
+    if (!b.enabled) {
+      body.innerHTML = '<p class="form-intro">La facturation n\'est pas encore activée.</p>';
+      return;
+    }
+    const paid = b.plan !== 'free';
+    let html = `<div class="sub-line">
+      <span class="plan-badge${paid ? '' : ' free'}">${PLAN_NAMES[b.plan] ?? b.plan}</span>
+      <strong>${STATUS_TXT[b.status] ?? (paid ? 'Abonnement actif' : 'Offre gratuite')}</strong>
+    </div>`;
+    if (b.usage.limit != null) {
+      const pct = Math.min(100, Math.round(b.usage.active / b.usage.limit * 100));
+      html += `<div class="usage">
+        <div class="usage-bar${b.usage.active >= b.usage.limit ? ' full' : ''}"><i style="width:${pct}%"></i></div>
+        <p class="usage-text">${b.usage.active} / ${b.usage.limit} devis actifs utilisés</p>
+      </div>`;
+    }
+    if (paid && b.currentPeriodEnd) {
+      html += `<p class="sub-meta">${b.cancelAtPeriodEnd
+        ? `Résiliation programmée — accès jusqu'au ${new Date(b.currentPeriodEnd).toLocaleDateString('fr-FR')}.`
+        : `Prochain renouvellement le ${new Date(b.currentPeriodEnd).toLocaleDateString('fr-FR')}.`}</p>`;
+    }
+    html += '<div class="sub-actions">';
+    if (!paid) {
+      const labels = { pro_monthly: 'Pro mensuel', pro_yearly: 'Pro annuel', team_monthly: 'Équipe mensuel', team_yearly: 'Équipe annuel' };
+      html += (b.prices || []).map(p =>
+        `<button class="btn btn-primary btn-sm" data-subscribe="${p.id}">${labels[p.key] ?? p.key} — ${fmtPrice(p.amount_cents)}${p.interval === 'year' ? '/an' : '/mois'}</button>`).join('')
+        || '<p class="form-intro">Aucune offre configurée.</p>';
+    }
+    if (b.hasCustomer)
+      html += `<button class="btn btn-quiet btn-sm" data-portal>${paid ? 'Gérer mon abonnement' : 'Portail de facturation'}<svg class="icon"><use href="#i-arrow"/></svg></button>`;
+    html += '</div>';
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<p class="form-intro">${esc(e.message || 'Abonnement indisponible.')}</p>`;
+  }
+}
+
+async function billingSubscribe(priceId, btn) {
+  const unbusy = busy(btn);
+  try {
+    const { url } = await api('/billing/checkout', { method: 'POST', body: { priceId } });
+    window.location.href = url;
+  } catch (e) { toast(e.message, 'error'); unbusy(); }
+}
+async function billingPortal(btn) {
+  const unbusy = busy(btn);
+  try {
+    const { url } = await api('/billing/portal', { method: 'POST', body: {} });
+    window.location.href = url;
+  } catch (e) { toast(e.message, 'error'); unbusy(); }
+}
 
 /* ---------- Compte : profil, entreprise, sécurité ---------- */
 let accountLoaded = false;
@@ -853,6 +926,8 @@ async function loadAdminStats() {
     { label: 'Emails non vérifiés', value: s.unverified },
     { label: 'Comptes suspendus', value: s.suspended },
     { label: 'Devis enregistrés', value: s.quotes },
+    { label: 'Abonnés payants', value: s.paying ?? 0 },
+    { label: 'Revenu mensuel récurrent', value: s.mrrCents != null ? fmtPrice(s.mrrCents) : '—' },
   ];
   $('#admin-stats').innerHTML = cards.map(c => `<article class="stat">
     <div class="stat-head">${icon('i-info')}<p>${c.label}</p></div>
@@ -865,14 +940,20 @@ async function loadAdminCompanies() {
   const sort = $('#admin-co-sort').value;
   const { companies } = await adminApi(`/companies?search=${encodeURIComponent(search)}&sort=${sort}`);
   $('#admin-companies-count').textContent = `${companies.length} entreprise(s)`;
-  $('#admin-companies').innerHTML = companies.map(c => `<tr>
+  $('#admin-companies').innerHTML = companies.map(c => {
+    const paidPlan = ['active', 'trialing', 'past_due'].includes(c.subscription_status) && c.plan !== 'free';
+    const planLabel = paidPlan ? (PLAN_NAMES[c.plan] ?? c.plan) : 'Gratuit';
+    const sub = paidPlan && c.subscription_status !== 'active' ? ` · ${STATUS_TXT[c.subscription_status] ?? c.subscription_status}` : '';
+    return `<tr>
     <td><strong>${esc(c.name)}</strong></td>
     <td>${esc(c.siren || '—')}</td>
+    <td><span class="plan-badge${paidPlan ? '' : ' free'}">${planLabel}</span>${esc(sub)}</td>
     <td>${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
     <td>${c.users_count}</td>
     <td>${c.quotes_count}</td>
     <td>${c.last_activity ? fmtDateTime(c.last_activity) : '—'}</td>
-  </tr>`).join('') || '<tr><td colspan="6" class="subtle">Aucune entreprise.</td></tr>';
+  </tr>`;
+  }).join('') || '<tr><td colspan="7" class="subtle">Aucune entreprise.</td></tr>';
 }
 let adminSearchTimer;
 $('#admin-co-search').oninput = () => { clearTimeout(adminSearchTimer); adminSearchTimer = setTimeout(loadAdminCompanies, 300); };
@@ -1080,6 +1161,7 @@ $('#csv').onchange = async e => {
   const params = new URLSearchParams(location.search);
   const resetToken = location.pathname === '/reinitialiser' && params.get('token');
   const justVerified = params.get('verifie') === '1';
+  const billingResult = params.get('billing');
 
   try {
     const c = await api('/config');
@@ -1087,6 +1169,15 @@ $('#csv').onchange = async e => {
   } catch { signupEnabled = false; }
   $('#auth-tabs').hidden = !signupEnabled;
   $('#tab-signup').hidden = !signupEnabled;
+
+  // Montants des offres relus depuis Stripe (endpoint public, cache serveur).
+  try {
+    const { prices } = await api('/billing/prices');
+    $$('[data-price]').forEach(el => {
+      const p = (prices || []).find(x => x.key === el.dataset.price);
+      if (p?.amount_cents != null) el.textContent = fmtPrice(p.amount_cents);
+    });
+  } catch { /* prix non disponibles : « — » affiché */ }
 
   if (resetToken) { showAuth('reset'); return; }
 
@@ -1099,6 +1190,9 @@ $('#csv').onchange = async e => {
         // Route directe /admin : réservée aux superadmins (ADMIN_EMAILS côté API).
         if (location.pathname === '/admin' && me.admin) { enterAdmin(); return; }
         if (location.pathname === '/admin') history.replaceState(null, '', '/');
+        // Retour de Stripe Checkout : le webhook a déjà mis à jour l'offre.
+        if (billingResult === 'success') { history.replaceState(null, '', '/'); toast('Abonnement activé, merci !'); }
+        else if (billingResult === 'cancel') { history.replaceState(null, '', '/'); toast('Souscription annulée — rien n\'a été débité.', 'info'); }
       }
       else {
         // Nom d'entreprise saisi à l'inscription, conservé en sessionStorage.

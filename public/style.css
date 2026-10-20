@@ -338,7 +338,7 @@ h3 { font-size: 16px; font-weight: 650; }
   font-size: 11px; font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted);
 }
-.price-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.price-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
 .price-plan {
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px;
 }
@@ -356,6 +356,29 @@ h3 { font-size: 16px; font-weight: 650; }
 .price li .icon { width: 15px; height: 15px; color: var(--green); transform: translateY(2px); }
 .price .btn-quiet { color: var(--muted); font-size: 13px; }
 .price-note { display: block; text-align: center; font-size: 12px; color: var(--muted); margin-top: 12px; }
+@media (max-width: 720px) { .price-plans { grid-template-columns: 1fr; } }
+
+/* --- Abonnement (espace client) --- */
+.sub-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan-badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--green-soft); color: var(--green);
+  padding: 4px 10px; border-radius: 6px;
+}
+.plan-badge.free { background: var(--line, #e8e4da); color: var(--muted); }
+.usage { margin: 12px 0 4px; }
+.usage-bar { height: 8px; border-radius: 4px; background: var(--line, #e8e4da); overflow: hidden; }
+.usage-bar > i { display: block; height: 100%; background: var(--green); transition: width .3s; }
+.usage-bar.full > i { background: var(--danger, #b33333); }
+.usage-text { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.sub-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.sub-meta { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.plan-limit {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--green-soft); border-radius: 8px; padding: 12px 14px; margin-top: 12px;
+}
+.plan-limit p { flex: 1; font-size: 13px; color: var(--ink); min-width: 200px; }
 
 /* ---------- FAQ ---------- */
 .faq {

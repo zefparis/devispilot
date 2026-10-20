@@ -59,4 +59,18 @@ export const config = {
     pass: process.env.SMTP_PASS ?? '',
     from: process.env.MAIL_FROM ?? 'DevisPilot <noreply@localhost>',
   },
+  // Abonnement Stripe (mode test ou live selon la clé). Sans clé, la
+  // facturation est désactivée et /api/billing renvoie enabled:false.
+  // Les montants affichés sont relus depuis l'API Stripe — jamais codés en dur.
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+    portalReturnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? '',
+    prices: {
+      pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? '',
+      pro_yearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? '',
+      team_monthly: process.env.STRIPE_PRICE_TEAM_MONTHLY ?? '',
+      team_yearly: process.env.STRIPE_PRICE_TEAM_YEARLY ?? '',
+    },
+  },
 };

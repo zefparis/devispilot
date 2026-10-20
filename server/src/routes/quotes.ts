@@ -2,6 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { validateQuote, isDate } from '../validate.js';
+import { remainingQuoteQuota } from '../stripe.js';
+
+const ACTIVE = ['sent', 'replied'];
+const LIMIT_ERROR = {
+  error: `Limite de l'offre Gratuit atteinte : 10 devis actifs maximum. Passez en Pro pour continuer.`,
+  code: 'PLAN_LIMIT',
+};
 
 const SELECT = `
   SELECT q.id, q.client, q.email, q.project,
@@ -35,6 +42,9 @@ export default async function quoteRoutes(app: FastifyInstance) {
     const v = validateQuote(req.body);
     if (!v.value) return reply.code(400).send({ error: v.error });
     const q = v.value;
+    // Limite Gratuit : 10 devis actifs. Appliquée côté serveur, jamais au seul front.
+    if (ACTIVE.includes(q.status) && (await remainingQuoteQuota(req.companyId!)) < 1)
+      return reply.code(403).send(LIMIT_ERROR);
     const { rows } = await pool.query(
       `INSERT INTO quotes (company_id, client, email, project, amount_cents, currency, sent, next, status, notes)
        VALUES ($1,$2,$3,$4,$5,'EUR',$6,$7,$8,$9) RETURNING id`,
@@ -47,6 +57,15 @@ export default async function quoteRoutes(app: FastifyInstance) {
     const v = validateQuote(req.body);
     if (!v.value) return reply.code(400).send({ error: v.error });
     const q = v.value;
+    // Réactivation d'un devis signé/perdu : il reconsomme le quota Gratuit.
+    if (ACTIVE.includes(q.status)) {
+      const { rows: cur } = await pool.query(
+        'SELECT status FROM quotes WHERE id=$1 AND company_id=$2',
+        [(req.params as any).id, req.companyId]);
+      if (!cur.length) return reply.code(404).send({ error: 'Devis introuvable.' });
+      if (!ACTIVE.includes(cur[0].status) && (await remainingQuoteQuota(req.companyId!)) < 1)
+        return reply.code(403).send(LIMIT_ERROR);
+    }
     const { rowCount } = await pool.query(
       `UPDATE quotes SET client=$3, email=$4, project=$5, amount_cents=$6, sent=$7,
               next=$8, status=$9, notes=$10, updated_at=now()

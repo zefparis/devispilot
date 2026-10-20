@@ -13,6 +13,7 @@ import profileRoutes from './routes/profile.js';
 import adminRoutes from './routes/admin.js';
 import { signupEnabledNow } from './settings.js';
 import miscRoutes from './routes/misc.js';
+import billingRoutes from './routes/billing.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -44,6 +45,9 @@ export async function buildApp() {
   app.addHook('onRequest', async (req, reply) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return;
     if (!req.url.startsWith('/api/')) return;
+    // Le webhook Stripe vient de serveurs tiers : pas d'en-tête applicatif
+    // ni d'Origin — l'authentification est la signature du payload.
+    if (req.url.startsWith('/api/stripe/webhook')) return;
     const origin = req.headers.origin;
     if (origin) {
       const allowed = config.corsOrigins.includes(origin)
@@ -98,6 +102,7 @@ export async function buildApp() {
   await app.register(profileRoutes);
   await app.register(importRoutes);
   await app.register(adminRoutes);
+  await app.register(billingRoutes);
 
   // Frontend statique (même origine que /api) + repli mono-page.
   await app.register(fastifyStatic, { root: config.staticRoot });

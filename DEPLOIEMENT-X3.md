@@ -52,6 +52,15 @@ SIGNUP_ENABLED=true                          # inscription libre une fois SMTP a
 
 ADMIN_EMAILS=votre-email@<domaine>           # accès back-office /admin — liste
                                               # d'emails séparés par des virgules
+
+# Abonnement Stripe — sk_test_* pour la préproduction, sk_live_* en prod
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...              # signing secret du webhook (étape 5)
+STRIPE_PORTAL_RETURN_URL=https://<domaine>
+STRIPE_PRICE_PRO_MONTHLY=price_...
+STRIPE_PRICE_PRO_YEARLY=price_...
+STRIPE_PRICE_TEAM_MONTHLY=price_...
+STRIPE_PRICE_TEAM_YEARLY=price_...
 ```
 
 `BASE_URL` en https active automatiquement les cookies `Secure`. `TRUST_PROXY=true`
@@ -77,6 +86,23 @@ L'API seule passe par le tunnel ; les requêtes sont cross-origin avec credentia
 
 Vérifier ensuite : `curl -s https://api.<domaine>/api/health` et
 `curl -s https://api.<domaine>/health`.
+
+## 5. Configuration Stripe (dashboard)
+
+1. **Produits** : créer 2 produits — « DevisPilot Pro » (prix mensuel + prix
+   annuel, récurrents, EUR HT) et « DevisPilot Équipe » (mensuel + annuel).
+   Copier les 4 `price_…` dans `.env`.
+2. **Portail client** : Paramètres → Billing → Customer portal → activer
+   (changement d'offre, moyen de paiement, factures, résiliation).
+3. **Webhook** : Développeurs → Webhooks → ajouter un endpoint
+   `https://api.<domaine>/api/stripe/webhook` avec les événements :
+   `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted`,
+   `invoice.paid`, `invoice.payment_failed`. Copier le *signing secret*
+   (`whsec_…`) dans `STRIPE_WEBHOOK_SECRET`, puis `docker compose up -d api`.
+4. Vérifier : `POST /api/billing/checkout` depuis l'espace client renvoie une
+   URL `checkout.stripe.com`; l'événement test du dashboard apparaît traité
+   (200) côté API.
 
 ## 3. Création des premiers comptes
 

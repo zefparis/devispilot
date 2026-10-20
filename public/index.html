@@ -124,28 +124,31 @@
   <section class="offer" id="offre">
     <div class="offer-copy">
       <p class="eyebrow eyebrow-light"><i></i>Nos offres</p>
-      <h2>Un démarrage accompagné, pas un logiciel de plus.</h2>
-      <p>Nous reprenons vos devis en cours, paramétrons vos modèles de relance et installons votre rituel de suivi. Ensuite, un point mensuel pour ajuster la méthode.</p>
-      <p class="offer-note">Les fonctionnalités et limites exactes de chaque plan restent à définir avec les premiers clients ; aucun paiement n'est encore ouvert.</p>
+      <h2>Commencez gratuitement, payez quand ça décolle.</h2>
+      <p>Suivez vos devis sans carte bancaire, sans limite de temps. Quand votre portefeuille grandit, passez en Pro en deux clics — et gérez tout depuis votre espace.</p>
+      <p class="offer-note">Paiement sécurisé par Stripe · code promo accepté à la souscription · résiliable à tout moment depuis votre espace.</p>
     </div>
     <div class="price" aria-label="Tarifs des offres">
       <p class="price-label">Nos offres</p>
       <div class="price-plans">
         <div class="price-plan">
-          <strong>Solo</strong>
-          <p><b>19 €</b> HT / mois</p>
-          <small>Pour un artisan seul</small>
+          <strong>Gratuit</strong>
+          <p><b>0 €</b></p>
+          <small>10 devis actifs · sans carte bancaire</small>
+        </div>
+        <div class="price-plan">
+          <strong>Pro</strong>
+          <p><b><span data-price="pro_monthly">—</span></b> HT / mois</p>
+          <small><span data-price="pro_yearly">—</span> HT / an · devis illimités</small>
         </div>
         <div class="price-plan">
           <strong>Équipe</strong>
-          <p><b>39 €</b> HT / mois</p>
-          <small>Pour plusieurs suivis en parallèle</small>
+          <p><b><span data-price="team_monthly">—</span></b> HT / mois</p>
+          <small><span data-price="team_yearly">—</span> HT / an · Pro + plusieurs utilisateurs</small>
         </div>
       </div>
-      <p class="price-sub">Installation accompagnée facultative : <strong>99 €</strong> HT — reprise de vos devis, réglages et formation courte.</p>
-      <button class="btn btn-primary btn-block" data-open>Créer un compte<svg class="icon"><use href="#i-arrow"/></svg></button>
-      <button class="btn btn-quiet btn-block" id="buy">Vérifier la disponibilité de l'offre</button>
-      <small id="payment-note" class="price-note">Paiement non configuré · aucun prélèvement</small>
+      <button class="btn btn-primary btn-block" data-open>Créer un compte gratuit<svg class="icon"><use href="#i-arrow"/></svg></button>
+      <small class="price-note">Sans engagement · changement d'offre à tout moment</small>
     </div>
   </section>
 
@@ -169,7 +172,7 @@
       </details>
       <details>
         <summary>Comment se passe le paiement de l'offre ?<svg class="icon"><use href="#i-chev"/></svg></summary>
-        <p>Le service sera facturé via une page de paiement hébergée par Stripe, configurée par l'équipe DevisPilot. Aucun paiement n'est encore ouvert : aucune facturation n'est demandée pour l'instant.</p>
+        <p>Vous souscrivez sur une page de paiement hébergée par Stripe (code promo accepté), puis tout se gère depuis votre espace : changement d'offre, carte, factures, résiliation — sans intervention de notre part. L'offre Gratuit ne demande aucune carte.</p>
       </details>
       <details>
         <summary>Puis-je importer mes devis existants ?<svg class="icon"><use href="#i-chev"/></svg></summary>
@@ -178,7 +181,7 @@
     </div>
   </section>
 
-  <p class="limits">Compte sécurisé · données hébergées sur notre serveur en France · envois manuels · aucune facturation pour l'instant.</p>
+  <p class="limits">Compte sécurisé · données hébergées sur notre serveur en France · gratuit pour démarrer · résiliable à tout moment.</p>
 
   <footer class="site-footer">
     <a class="brand" href="#">
@@ -461,6 +464,10 @@
           <p class="page-sub">Identité de vos messages et lien de paiement de l'offre.</p>
         </div>
       </div>
+      <div id="sub-panel" class="panel form-panel" hidden>
+        <h3>Abonnement</h3>
+        <div id="sub-body"><p class="form-intro">Chargement…</p></div>
+      </div>
       <div class="settings-grid single">
         <form id="settings-form" class="panel form-panel" novalidate>
           <h3>Votre entreprise et vos messages</h3>
@@ -662,7 +669,8 @@
           <table>
             <thead><tr>
               <th scope="col">Raison sociale</th><th scope="col">SIREN/SIRET</th>
-              <th scope="col">Créée le</th><th scope="col">Utilisateurs</th>
+              <th scope="col">Offre</th><th scope="col">Créée le</th>
+              <th scope="col">Utilisateurs</th>
               <th scope="col">Devis</th><th scope="col">Dernière activité</th>
             </tr></thead>
             <tbody id="admin-companies"></tbody>
@@ -797,6 +805,10 @@
         <label for="q-notes">Notes <span class="opt">(contexte, objections…)</span></label>
         <textarea id="q-notes" name="notes" rows="2" maxlength="2000" placeholder="Ex. attend le retour de son assurance, préfère être rappelé le soir"></textarea>
       </div>
+    </div>
+    <div id="plan-limit-note" class="plan-limit" hidden>
+      <p id="plan-limit-text"></p>
+      <button type="button" class="btn btn-primary btn-sm" id="plan-limit-upgrade">Passer en Pro</button>
     </div>
     <div class="dialog-footer">
       <button type="button" id="delete" class="btn btn-danger btn-sm" hidden><svg class="icon"><use href="#i-trash"/></svg>Supprimer</button>

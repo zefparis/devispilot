@@ -5,6 +5,7 @@ import { requireAdmin } from '../guards.js';
 import { auth } from '../auth.js';
 import { settingValue, setSetting } from '../settings.js';
 import { config } from '../config.js';
+import { priceInfo } from '../stripe.js';
 import crypto from 'node:crypto';
 
 // Journal d'audit : métadonnées uniquement — jamais de contenu métier
@@ -33,10 +34,23 @@ export default async function adminRoutes(app: FastifyInstance) {
       pool.query('SELECT count(*) AS n FROM "user" WHERE suspended_at IS NOT NULL'),
     ]);
     const one = (r: any) => Number(r.rows[0].n);
+
+    // Abonnés payants (plan actif/trialing/past_due) + MRR normalisé :
+    // montants relus depuis l'API Stripe (cache), annuel ÷ 12.
+    const { rows: paying } = await pool.query<{ subscription_price_id: string; status: string }>(
+      `SELECT subscription_price_id, subscription_status AS status FROM companies
+        WHERE plan <> 'free' AND subscription_status IN ('active','trialing','past_due')`);
+    let mrrCents = 0;
+    for (const p of paying) {
+      const info = p.subscription_price_id ? await priceInfo(p.subscription_price_id) : null;
+      if (!info?.unit_amount) continue;
+      mrrCents += info.interval === 'year' ? Math.round(info.unit_amount / 12) : info.unit_amount;
+    }
     return {
       companies: one(companies), users: one(users),
       signups7: one(signups7), signups30: one(signups30),
       unverified: one(unverified), quotes: one(quotes), suspended: one(suspended),
+      paying: paying.length, mrrCents,
     };
   });
 
@@ -53,6 +67,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const order = COMPANY_SORTS[(req.query as any)?.sort] ?? COMPANY_SORTS.created_at;
     const { rows } = await pool.query(
       `SELECT c.id, c.name, c.siren, c.created_at::text,
+              c.plan, c.subscription_status,
               (SELECT count(*) FROM memberships m WHERE m.company_id=c.id) AS users_count,
               (SELECT count(*) FROM quotes qt WHERE qt.company_id=c.id) AS quotes_count,
               GREATEST(
