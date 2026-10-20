@@ -3,7 +3,7 @@ import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { config } from '../config.js';
 import {
-  stripe, stripeEnabled, priceInfo, planForPrice, knownPriceIds,
+  stripe, stripeEnabled, priceInfo, planForPrice, knownPriceIds, visiblePriceEntries,
   companyBilling, effectivePlan, activeQuoteCount, FREE_ACTIVE_LIMIT,
 } from '../stripe.js';
 
@@ -146,7 +146,7 @@ export default async function billingRoutes(app: FastifyInstance) {
 
   /* ---------- Prix publics (montants relus depuis Stripe, en cache) ---------- */
   app.get('/api/billing/prices', async () => {
-    const entries = Object.entries(config.stripe.prices).filter(([, id]) => id);
+    const entries = visiblePriceEntries();
     const infos = await Promise.all(entries.map(([, id]) => priceInfo(id)));
     const out = entries.map(([key, id], i) => ({
       key, id,
@@ -163,8 +163,7 @@ export default async function billingRoutes(app: FastifyInstance) {
     const b = await companyBilling(req.companyId!);
     const active = await activeQuoteCount(req.companyId!);
     const eff = effectivePlan(b);
-    const priceEntries = eff === 'free'
-      ? Object.entries(config.stripe.prices).filter(([, id]) => id) : [];
+    const priceEntries = eff === 'free' ? visiblePriceEntries() : [];
     const infos = await Promise.all(priceEntries.map(([, id]) => priceInfo(id)));
     const prices = priceEntries.map(([key, id], i) => ({
       key, id, plan: planForPrice(id), interval: key.endsWith('_yearly') ? 'year' : 'month',

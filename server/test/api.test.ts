@@ -561,5 +561,15 @@ test('billing : état d\'abonnement exposé à l\'entreprise courante', async ()
   // L'endpoint public de prix est accessible sans session.
   const p = await app.inject({ method: 'GET', url: '/api/billing/prices' });
   assert.equal(p.statusCode, 200);
-  assert.equal(p.json().prices.length, 4);
+  const prices = p.json().prices;
+  // TEAM_PLAN_ENABLED=false par défaut : seules les offres Pro sont publiées.
+  assert.equal(prices.length, 2);
+  assert.ok(!prices.some((x: any) => x.key.startsWith('team_')), 'Équipe masquée');
+});
+
+test('abonnement : Checkout refuse les offres Équipe tant que TEAM_PLAN_ENABLED=false', async () => {
+  const cookie = await signup('team-gate@x.fr'); await createCompany(cookie, 'TeamGate');
+  const r = await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: { ...H, cookie }, payload: { priceId: 'price_team_m' } });
+  assert.equal(r.statusCode, 400, `team refusé → ${r.statusCode} ${r.body}`);
+  assert.match(r.json().error, /offre inconnue/i);
 });

@@ -1171,8 +1171,12 @@ $('#csv').onchange = async e => {
   $('#tab-signup').hidden = !signupEnabled;
 
   // Montants des offres relus depuis Stripe (endpoint public, cache serveur).
+  // L'offre Équipe est masquée tant que le serveur ne la publie pas.
   try {
     const { prices } = await api('/billing/prices');
+    const keys = new Set((prices || []).map(p => p.key));
+    const team = document.querySelector('[data-plan-card="team"]');
+    if (team) team.hidden = ![...keys].some(k => k.startsWith('team_'));
     $$('[data-price]').forEach(el => {
       const p = (prices || []).find(x => x.key === el.dataset.price);
       if (p?.amount_cents != null) el.textContent = fmtPrice(p.amount_cents);

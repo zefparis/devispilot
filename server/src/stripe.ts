@@ -19,7 +19,17 @@ for (const [key, id] of Object.entries(config.stripe.prices)) {
   PRICE_TO_PLAN[id] = key.startsWith('pro_') ? 'pro' : 'team';
 }
 export const planForPrice = (priceId: string) => PRICE_TO_PLAN[priceId];
-export const knownPriceIds = () => new Set(Object.keys(PRICE_TO_PLAN));
+// Offres souscriptibles : l'Équipe est exclue tant que TEAM_PLAN_ENABLED=false.
+export const knownPriceIds = () => new Set(
+  Object.keys(config.stripe.prices)
+    .filter(k => config.stripe.teamPlanEnabled || !k.startsWith('team_'))
+    .map(k => config.stripe.prices[k as keyof typeof config.stripe.prices])
+    .filter(Boolean) as string[],
+);
+// Entrées de prix visibles (landing, panneau Abonnement) — mêmes exclusions.
+export const visiblePriceEntries = () =>
+  Object.entries(config.stripe.prices)
+    .filter(([key, id]) => id && (config.stripe.teamPlanEnabled || !key.startsWith('team_')));
 
 // Cache des montants des prix lus depuis l'API Stripe (10 min) : les montants
 // affichés restent synchronisés avec le dashboard, jamais codés en dur.

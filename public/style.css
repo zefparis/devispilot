@@ -338,7 +338,7 @@ h3 { font-size: 16px; font-weight: 650; }
   font-size: 11px; font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted);
 }
-.price-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+.price-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
 .price-plan {
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px;
 }

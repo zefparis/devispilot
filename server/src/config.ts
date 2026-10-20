@@ -72,5 +72,8 @@ export const config = {
       team_monthly: process.env.STRIPE_PRICE_TEAM_MONTHLY ?? '',
       team_yearly: process.env.STRIPE_PRICE_TEAM_YEARLY ?? '',
     },
+    // L'offre Équipe est masquée (landing, abonnement, Checkout refusé) tant
+    // que l'invitation de membres n'existe pas. Le code et les price IDs restent.
+    teamPlanEnabled: process.env.TEAM_PLAN_ENABLED === 'true',
   },
 };
