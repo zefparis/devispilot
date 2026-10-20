@@ -1,0 +1,16 @@
+# Inutiles au build front (public/ + build.mjs + package.json suffisent)
+server/
+captures/
+dumps/
+scripts/
+docs/
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+*.md
+docker-compose.yml
+node_modules/
+dist/
+DEPLOIEMENT-X3.md

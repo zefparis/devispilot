@@ -7,6 +7,10 @@
    - « live » : toutes les données passent par l'API (session cookie HttpOnly).
    ============================================================ */
 
+// URL de base de l'API : injectée par config.js (déploiement front séparé).
+// Chaîne vide = même origine (auto-hébergement X3, dev local).
+const API_BASE = (window.DP_API_URL || '').replace(/\/+$/, '');
+
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const LEGACY_KEY = 'devispilot-v1';      // ancien stockage local (migration)
@@ -89,9 +93,9 @@ $$('dialog').forEach(d => d.addEventListener('click', e => {
 
 /* ---------- Couche API ---------- */
 async function api(path, { method = 'GET', body } = {}) {
-  const r = await fetch('/api' + path, {
+  const r = await fetch(API_BASE + '/api' + path, {
     method,
-    credentials: 'same-origin',
+    credentials: 'include',
     headers: {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       'x-devispilot-client': '1',
@@ -737,7 +741,7 @@ $('#export').onclick = async () => {
     return toast('Export des devis téléchargé. Historique détaillé non inclus.');
   }
   try {
-    const r = await fetch('/api/export.csv', { credentials: 'same-origin' });
+    const r = await fetch(API_BASE + '/api/export.csv', { credentials: 'include' });
     if (r.status === 401) { session = null; mode = 'landing'; showAuth('Votre session a expiré.'); return; }
     if (!r.ok) throw new Error('Export impossible.');
     download('devispilot-devis.csv', await r.text());

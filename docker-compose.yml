@@ -33,8 +33,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-devispilot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-devispilot}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?définir dans .env}
       BASE_URL: ${BASE_URL:-http://127.0.0.1:3400}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
-      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       # Loopback uniquement : le tunnel cloudflared tourne sur l'hôte X3.

@@ -19,8 +19,13 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,           // glissement quotidien
   },
   advanced: {
-    useSecureCookies: config.cookieSecure,
+    useSecureCookies: config.cookieSecure || config.crossSite,
     cookiePrefix: 'dp',
+    // Front sur une autre origine (ex. Vercel ↔ api.<domaine>) : SameSite=None
+    // est requis pour que le cookie de session soit envoyé (HTTPS obligatoire).
+    ...(config.crossSite
+      ? { defaultCookieAttributes: { sameSite: 'none' as const, secure: true, httpOnly: true } }
+      : {}),
     // Inscription publique bloquée aussi côté route (voir routes/auth.ts).
     disableCSRFCheck: false,
     database: {
@@ -30,7 +35,7 @@ export const auth = betterAuth({
       validateSchema: false,
     },
   },
-  trustedOrigins: [config.baseUrl],
+  trustedOrigins: [config.baseUrl, ...config.corsOrigins],
   logger: { level: 'warn' },
 });
 

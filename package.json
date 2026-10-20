@@ -1,0 +1,10 @@
+{
+  "name": "devispilot-front",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend statique DevisPilot — build minimal (copie public/ → dist/ + injection URL API)",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

@@ -9,6 +9,9 @@ export default async function miscRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // Sonde légère pour monitoring externe (Uptime Kuma) — pas de requête DB.
+  app.get('/health', async () => ({ status: 'ok' }));
+
   // Configuration publique minimale lue par le frontend au démarrage.
   app.get('/api/config', async () => ({
     signupEnabled: (app as any).signupEnabled,

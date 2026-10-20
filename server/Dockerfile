@@ -1,4 +1,4 @@
-# Build context : racine du dépôt (server/ + dist/).
+# Build context : racine du dépôt (server/ + public/).
 # docker build -f server/Dockerfile .
 FROM node:24-alpine AS build
 WORKDIR /app
@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY server/migrations ./migrations
-COPY dist /srv/static
+COPY public /srv/static
 USER node
 EXPOSE 3400
 CMD ["node", "dist/server.js"]

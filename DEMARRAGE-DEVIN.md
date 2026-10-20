@@ -2,9 +2,10 @@
 
 ## Démarrer
 Application statique HTML/CSS/JavaScript sans dépendance ni compilation.
-Depuis ce dossier : `python3 -m http.server 8080 --directory dist`, puis ouvrir http://localhost:8080.
-Vérification JavaScript : `node --check dist/app.js`.
-Pour Vercel/Netlify : dossier public `dist`, sans commande de build.
+Sources dans `public/` ; `dist/` est généré par `npm run build` (copie + config API).
+Depuis ce dossier : `python3 -m http.server 8080 --directory public`, puis ouvrir http://localhost:8080.
+Vérification JavaScript : `node --check public/app.js`.
+Pour Vercel : build `npm run build`, dossier de sortie `dist` (voir vercel.json).
 
 ## Mission initiale pour Devin
 Auditer ce prototype et proposer un plan avant toute réécriture. Conserver le design et les fonctionnalités existantes sauf amélioration justifiée. Créer un dépôt Git propre à ce projet et travailler par étapes avec des previews.

@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import cors from '@fastify/cors';
 import { config } from './config.js';
 import { auth } from './auth.js';
 import { nodeHeaders } from './guards.js';
@@ -25,6 +26,15 @@ export async function buildApp() {
 
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
 
+  // CORS : origines frontend autorisées (CORS_ORIGINS). Cookies inclus
+  // (sessions cross-site). Aucune origine configurée = même origine seule.
+  if (config.corsOrigins.length) {
+    await app.register(cors, {
+      origin: (origin, cb) => cb(null, !origin || config.corsOrigins.includes(origin)),
+      credentials: true,
+    });
+  }
+
   // CSRF : toute mutation /api exige l'en-tête applicatif, et l'Origin,
   // quand elle est présente, doit correspondre à l'hôte servi.
   app.addHook('onRequest', async (req, reply) => {
@@ -32,12 +42,9 @@ export async function buildApp() {
     if (!req.url.startsWith('/api/')) return;
     const origin = req.headers.origin;
     if (origin) {
-      try {
-        if (new URL(origin).host !== req.headers.host)
-          return reply.code(403).send({ error: 'Origine refusée.' });
-      } catch {
-        return reply.code(403).send({ error: 'Origine invalide.' });
-      }
+      const allowed = config.corsOrigins.includes(origin)
+        || (() => { try { return new URL(origin).host === req.headers.host; } catch { return false; } })();
+      if (!allowed) return reply.code(403).send({ error: 'Origine refusée.' });
     }
     if (req.headers['x-devispilot-client'] !== '1')
       return reply.code(403).send({ error: 'Requête bloquée (protection CSRF).' });

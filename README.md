@@ -1,11 +1,11 @@
 # DevisPilot
 
 Prototype de suivi de devis et de relances pour petites entreprises de climatisation/chauffage.
-Frontend HTML/CSS/JavaScript sans build (`dist/`), API Node.js/TypeScript + Fastify + PostgreSQL (`server/`), déploiement Docker Compose.
+Frontend HTML/CSS/JavaScript buildless (sources `public/`, build minimal `npm run build` → `dist/` pour Vercel), API Node.js/TypeScript + Fastify + PostgreSQL (`server/`), déploiement Vercel (front) + Docker Compose sur X3 (API, tunnel Cloudflare).
 
 ## Architecture
 
-- `dist/` — frontend statique servi par l'API (même origine que `/api`, cookies HttpOnly).
+- `public/` — frontend statique. Servi par l'API en auto-hébergement (même origine, cookies HttpOnly) ou déployé sur Vercel (`dist/` généré, `config.js` injecte `VITE_API_URL` → cookies cross-site SameSite=None;Secure + CORS).
 - `server/` — API Fastify : Better Auth (sessions serveur en base, révocables), isolation par entreprise via `memberships`, protection CSRF (en-tête `x-devispilot-client` + contrôle d'origine), rate-limit, montants en centimes, relances atomiques et idempotentes.
 - `server/migrations/` — schéma versionné, appliqué automatiquement au démarrage.
 - `docker-compose.yml` — PostgreSQL privé (aucun port publié) + API publiée sur `127.0.0.1:${API_PORT}` pour cloudflared hôte.
@@ -26,7 +26,7 @@ npm run dev          # migrations auto + API+front sur http://localhost:3410
 
 npm test             # suite d'intégration (12 tests, base dédiée jetable)
 npm run typecheck
-node --check dist/app.js
+node --check public/app.js
 ```
 
 Mode démo : boutons « Tester la démo » — données fictives en mémoire, **aucun accès serveur**, aucune écriture dans une entreprise réelle.

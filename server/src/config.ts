@@ -11,6 +11,9 @@ function req(name: string, fallback?: string): string {
 
 const isProd = process.env.NODE_ENV === 'production';
 const baseUrl = process.env.BASE_URL ?? 'http://localhost:3400';
+// Origines frontend autorisées (déploiement séparé, ex. Vercel → api.<domaine>).
+const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
 export const config = {
   isProd,
@@ -19,12 +22,17 @@ export const config = {
   host: process.env.HOST ?? '127.0.0.1',
   databaseUrl: req('DATABASE_URL', 'postgres://devispilot:devispilot@127.0.0.1:5432/devispilot'),
   baseUrl,
+  corsOrigins,
+  // Front sur une autre origine (Vercel ↔ api.<domaine>) : cookies cross-site
+  // obligatoirement SameSite=None + Secure (HTTPS requis).
+  crossSite: corsOrigins.length > 0,
   // Inscription publique : activée en dev, à garder désactivée en production
   // tant que la vérification d'email n'est pas opérationnelle.
   signupEnabled: process.env.SIGNUP_ENABLED ? process.env.SIGNUP_ENABLED === 'true' : !isProd,
   authSecret: req('BETTER_AUTH_SECRET', 'dev-only-secret-change-me-0123456789abcdef'),
   cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : baseUrl.startsWith('https:'),
   // Cookie SameSite=Lax : navigation normale OK, POST inter-sites bloqué (avec garde CSRF en plus).
-  staticRoot: process.env.STATIC_ROOT ?? path.resolve(__dirname, '../../dist'),
-  trustProxy: process.env.TRUST_PROXY === 'true',
+  staticRoot: process.env.STATIC_ROOT ?? path.resolve(__dirname, '../../public'),
+  // cloudflared (tunnel sur l'hôte) relaie X-Forwarded-* : trustProxy actif par défaut.
+  trustProxy: process.env.TRUST_PROXY !== 'false',
 };
