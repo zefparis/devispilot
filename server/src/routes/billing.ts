@@ -12,6 +12,10 @@ import { cgvAccepted } from '../legal.js';
 // Abonnement Perspecta via Stripe. Le webhook est la source de vérité :
 // plan/statut/période sont écrits par les événements, jamais par le client.
 
+// Erreur Stripe → 502 propre : le statusCode et les headers de la réponse
+// Stripe (dont access-control-allow-origin:*) ne sont jamais propagés.
+const STRIPE_DOWN = 'Le service de paiement est momentanément indisponible.';
+
 async function companyContact(companyId: string) {
   const { rows } = await pool.query<{ name: string; siren: string | null; contact_email: string | null; email: string | null }>(
     `SELECT c.name, c.siren, c.contact_email, u.email
@@ -197,11 +201,17 @@ export default async function billingRoutes(app: FastifyInstance) {
     let customerId = b.stripe_customer_id;
     if (!customerId) {
       const c = await companyContact(req.companyId!);
-      const customer = await s.customers.create({
-        name: c?.name ?? undefined,
-        email: c?.contact_email || c?.email || undefined,
-        metadata: { company_id: req.companyId!, siren: c?.siren ?? '' },
-      });
+      let customer: Stripe.Customer;
+      try {
+        customer = await s.customers.create({
+          name: c?.name ?? undefined,
+          email: c?.contact_email || c?.email || undefined,
+          metadata: { company_id: req.companyId!, siren: c?.siren ?? '' },
+        });
+      } catch (err) {
+        req.log.warn({ err }, 'stripe customers.create a échoué');
+        return reply.code(502).send({ error: STRIPE_DOWN });
+      }
       customerId = customer.id;
       await pool.query('UPDATE companies SET stripe_customer_id=$2 WHERE id=$1', [req.companyId, customerId]);
     }
@@ -225,16 +235,24 @@ export default async function billingRoutes(app: FastifyInstance) {
       success_url: `${config.frontUrl}/?billing=success`,
       cancel_url: `${config.frontUrl}/?billing=cancel`,
     };
-    let session;
+    let session: Stripe.Checkout.Session;
     try {
       session = await s.checkout.sessions.create(params);
     } catch (err) {
       // Certains comptes ne permettent pas consent_collection : l'acceptation
       // reste garantie par le garde CGV en amont (dans l'app).
-      if (!/terms_of_service|consent_collection|custom_text/i.test(String((err as any)?.message))) throw err;
+      if (!/terms_of_service|consent_collection|custom_text/i.test(String((err as any)?.message))) {
+        req.log.warn({ err }, 'stripe checkout.sessions.create a échoué');
+        return reply.code(502).send({ error: STRIPE_DOWN });
+      }
       delete params.consent_collection; delete params.custom_text;
       req.log.warn('stripe: consent_collection indisponible, checkout sans case CGV');
-      session = await s.checkout.sessions.create(params);
+      try {
+        session = await s.checkout.sessions.create(params);
+      } catch (err2) {
+        req.log.warn({ err: err2 }, 'stripe checkout.sessions.create a échoué (repli)');
+        return reply.code(502).send({ error: STRIPE_DOWN });
+      }
     }
     return { url: session.url };
   });
@@ -245,10 +263,16 @@ export default async function billingRoutes(app: FastifyInstance) {
     if (!s) return reply.code(503).send({ error: 'Facturation non configurée.' });
     const b = await companyBilling(req.companyId!);
     if (!b.stripe_customer_id) return reply.code(404).send({ error: 'Aucun abonnement à gérer.' });
-    const session = await s.billingPortal.sessions.create({
-      customer: b.stripe_customer_id,
-      return_url: config.stripe.portalReturnUrl || config.frontUrl,
-    });
+    let session: Stripe.BillingPortal.Session;
+    try {
+      session = await s.billingPortal.sessions.create({
+        customer: b.stripe_customer_id,
+        return_url: config.stripe.portalReturnUrl || config.frontUrl,
+      });
+    } catch (err) {
+      req.log.warn({ err }, 'stripe billingPortal.sessions.create a échoué');
+      return reply.code(502).send({ error: STRIPE_DOWN });
+    }
     return { url: session.url };
   });
 }

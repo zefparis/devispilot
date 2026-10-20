@@ -11,6 +11,8 @@ process.env.BETTER_AUTH_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
 process.env.NODE_ENV = 'test';
 process.env.RATE_LIMIT_AUTH_MAX = '1000';
 process.env.ADMIN_EMAILS = 'admin@devispilot.test';
+// Une origine autorisée pour vérifier que les erreurs n'écrasent jamais le CORS.
+process.env.CORS_ORIGINS = 'https://perspecta.test';
 // Driver email de test : capture en mémoire, aucun réseau.
 process.env.SMTP_HOST = 'log';
 process.env.MAIL_FROM = 'Perspecta Test <test@devispilot.local>';
@@ -24,6 +26,7 @@ process.env.STRIPE_PRICE_TEAM_YEARLY = 'price_team_y';
 
 const { buildApp } = await import('../src/app.js');
 const { migrate, pool } = await import('../src/db.js');
+const { stripe } = await import('../src/stripe.js');
 const { outbox } = await import('../src/mailer.js');
 const { CGV_VERSION } = await import('../src/legal.js');
 
@@ -576,6 +579,59 @@ test('abonnement : Checkout refuse les offres Équipe tant que TEAM_PLAN_ENABLED
   const r = await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: { ...H, cookie }, payload: { priceId: 'price_team_m' } });
   assert.equal(r.statusCode, 400, `team refusé → ${r.statusCode} ${r.body}`);
   assert.match(r.json().error, /offre inconnue/i);
+});
+
+test('stripe : erreur Stripe → 502 propre, sans propagation de statut ni d\'en-têtes', async () => {
+  const cookie = await signup('stripe-down@x.fr'); await createCompany(cookie, 'StripeDown');
+  const s = stripe()!;
+  const fail = async () => {
+    throw new Stripe.errors.StripeAuthenticationError({
+      message: 'Invalid API Key provided', statusCode: 401,
+      headers: { 'access-control-allow-origin': '*' }, requestId: 'req_test',
+    } as any);
+  };
+  const origCustomers = s.customers.create;
+  const origSessions = s.checkout.sessions.create;
+  const origPortal = s.billingPortal.sessions.create;
+  s.customers.create = fail as any;
+  s.checkout.sessions.create = fail as any;
+  s.billingPortal.sessions.create = fail as any;
+  try {
+    // customers.create : nouvelle entreprise sans customer Stripe.
+    const r1 = await app.inject({
+      method: 'POST', url: '/api/billing/checkout',
+      headers: { ...H, cookie, origin: 'https://perspecta.test' },
+      payload: { priceId: 'price_pro_m' },
+    });
+    assert.equal(r1.statusCode, 502, `401 Stripe masqué → ${r1.statusCode}`);
+    assert.match(r1.json().error, /service de paiement/i);
+    assert.notEqual(r1.headers['access-control-allow-origin'], '*', 'ACAO jamais *');
+    assert.equal(r1.headers['access-control-allow-origin'], 'https://perspecta.test');
+
+    // sessions.create : même garde-fou avec un customer existant.
+    const { rows } = await pool.query(`SELECT id FROM companies WHERE name='StripeDown'`);
+    await pool.query('UPDATE companies SET stripe_customer_id=$1 WHERE id=$2', ['cus_down', rows[0].id]);
+    const r2 = await app.inject({
+      method: 'POST', url: '/api/billing/checkout',
+      headers: { ...H, cookie, origin: 'https://perspecta.test' },
+      payload: { priceId: 'price_pro_m' },
+    });
+    assert.equal(r2.statusCode, 502, `checkout → ${r2.statusCode}`);
+    assert.notEqual(r2.headers['access-control-allow-origin'], '*');
+
+    // Portail client : même traitement.
+    const r3 = await app.inject({
+      method: 'POST', url: '/api/billing/portal',
+      headers: { ...H, cookie, origin: 'https://perspecta.test' },
+      payload: {},
+    });
+    assert.equal(r3.statusCode, 502, `portal → ${r3.statusCode}`);
+    assert.notEqual(r3.headers['access-control-allow-origin'], '*');
+  } finally {
+    s.customers.create = origCustomers;
+    s.checkout.sessions.create = origSessions;
+    s.billingPortal.sessions.create = origPortal;
+  }
 });
 
 /* ---------- CGV : acceptation obligatoire et versionnée ---------- */

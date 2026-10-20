@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import type { FastifyError } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import cors from '@fastify/cors';
@@ -40,6 +41,21 @@ export async function buildApp() {
       credentials: true,
     });
   }
+
+  // Gestionnaire d'erreurs : jamais de propagation des en-têtes ni du statut
+  // d'un service externe (Stripe pose headers dont access-control-allow-origin:*
+  // sur ses erreurs → fausse erreur CORS côté navigateur). CORS reste géré
+  // par @fastify/cors ; le détail reste dans les logs serveur.
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    if ((err as any).headers) {
+      req.log.warn({ err }, 'erreur d\'un service externe (statut et en-têtes non propagés)');
+      return reply.code(502).send({ error: 'Un service externe est momentanément indisponible.' });
+    }
+    const status = typeof err.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 500
+      ? err.statusCode : 500;
+    if (status === 500) req.log.error({ err }, 'erreur non gérée');
+    return reply.code(status).send({ error: status === 500 ? 'Erreur interne.' : err.message });
+  });
 
   // CSRF : toute mutation /api exige l'en-tête applicatif, et l'Origin,
   // quand elle est présente, doit correspondre à l'hôte servi.
