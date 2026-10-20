@@ -1,0 +1,57 @@
+# DevisPilot — stack dédiée. PostgreSQL reste privé (aucun port publié) ;
+# l'API n'est exposée que sur 127.0.0.1:${API_PORT} pour cloudflared (tunnel sur l'hôte).
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: devispilot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devispilot}
+      POSTGRES_USER: ${POSTGRES_USER:-devispilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [app]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devispilot} -d ${POSTGRES_DB:-devispilot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: devispilot-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-devispilot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-devispilot}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?définir dans .env}
+      BASE_URL: ${BASE_URL:-http://127.0.0.1:3400}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      # Loopback uniquement : le tunnel cloudflared tourne sur l'hôte X3.
+      - "127.0.0.1:${API_PORT:-3400}:3400"
+    networks: [app]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3400/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  app:
+    name: devispilot-net
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: devispilot-pgdata

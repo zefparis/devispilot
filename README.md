@@ -1,14 +1,44 @@
 # DevisPilot
-Private validation prototype. Buildless HTML/CSS/JavaScript; no dependencies. All records and configuration persist in browser localStorage only. No server database, tenant accounts, AI API, mail sending, scheduling, or Stripe webhook. This is not a production subscription platform.
 
-## What works
-Quote create/edit/delete; status updates; due follow-up queue; editable deterministic French message templates; copy and mailto; explicit manual follow-up confirmation; CSV import/export; local settings; Stripe-hosted Payment Link navigation after configuring a valid buy.stripe.com URL. CSV export neutralizes spreadsheet formula prefixes. Imported text is HTML escaped.
+Prototype de suivi de devis et de relances pour petites entreprises de climatisation/chauffage.
+Frontend HTML/CSS/JavaScript sans build (`dist/`), API Node.js/TypeScript + Fastify + PostgreSQL (`server/`), déploiement Docker Compose.
 
-## Commercial hypothesis
-Initial vertical: small heating/air-conditioning installers. Done-with-you onboarding €290 HT plus €79 HT/month proposed. Start with a manually operated service and interviews; no unsupported revenue/ROI claims. Competition includes Relance+, so willingness to pay for implementation and support must be validated.
+## Architecture
 
-## Before launch
-Validate 3 paid pilots out of 20 targeted conversations; measure actual support cost and conversion. Add server-side per-company isolation, identity and authorization, durable backups/export/delete, Stripe Checkout subscription verification and signed idempotent webhooks, billing portal, legal terms, privacy, tax configuration. Never trust a return URL or local setting as proof of payment. Email automation requires separately configured delivery and opt-out handling. Do not put Stripe secret keys in this static app.
+- `dist/` — frontend statique servi par l'API (même origine que `/api`, cookies HttpOnly).
+- `server/` — API Fastify : Better Auth (sessions serveur en base, révocables), isolation par entreprise via `memberships`, protection CSRF (en-tête `x-devispilot-client` + contrôle d'origine), rate-limit, montants en centimes, relances atomiques et idempotentes.
+- `server/migrations/` — schéma versionné, appliqué automatiquement au démarrage.
+- `docker-compose.yml` — PostgreSQL privé (aucun port publié) + API publiée sur `127.0.0.1:${API_PORT}` pour cloudflared hôte.
+- `scripts/backup.sh`, `scripts/restore.sh` — sauvegarde/restauration PostgreSQL.
+- `DEPLOIEMENT-X3.md` — guide complet de déploiement sur le serveur X3.
 
-## CSV
-Export a sample to obtain headers: client;email;project;amount;sent;status;next;notes. Dates YYYY-MM-DD, statuses sent/replied/won/lost. Export does not preserve detailed follow-up history. Browser/device changes do not synchronize data.
+## Développement local
+
+```bash
+# PostgreSQL de dev
+docker run -d --name dp-pg -e POSTGRES_USER=devispilot -e POSTGRES_PASSWORD=devispilot -e POSTGRES_DB=devispilot -p 127.0.0.1:5444:5432 postgres:17-alpine
+
+cd server
+npm ci
+DATABASE_URL=postgres://devispilot:devispilot@127.0.0.1:5444/devispilot \
+PORT=3410 BASE_URL=http://localhost:3410 BETTER_AUTH_SECRET=<32+ chars> \
+npm run dev          # migrations auto + API+front sur http://localhost:3410
+
+npm test             # suite d'intégration (12 tests, base dédiée jetable)
+npm run typecheck
+node --check dist/app.js
+```
+
+Mode démo : boutons « Tester la démo » — données fictives en mémoire, **aucun accès serveur**, aucune écriture dans une entreprise réelle.
+
+## Ce qui fonctionne
+
+Inscription/connexion (inscription désactivable via `SIGNUP_ENABLED`), création d'entreprise, sessions HttpOnly, devis CRUD, file de relances, confirmation manuelle avec prochaine date (atomique + idempotent), messages déterministes modifiables, import CSV validé (anti-doublon par empreinte), export CSV (BOM, neutralisation de formules), migration explicite des devis localStorage avec aperçu/bilan, réglages signature + Payment Link validé `buy.stripe.com`.
+
+## Limites (affichées dans le produit)
+
+Aucune vérification de paiement (« Paiements non connectés »), pas d'envoi automatique (copier/mailto uniquement), pas d'IA, inscription publique fermée en production tant que l'email transactionnel n'est pas configuré, pas de « mot de passe oublié », pas d'abonnement Stripe — les tarifs affichés sont des offres pilotes dont le périmètre reste à définir.
+
+## Commercial
+
+Offres pilotes affichées : Solo 19 € HT/mois, Équipe 39 € HT/mois, installation accompagnée facultative 99 € HT. Fonctionnalités et limites commerciales à définir. Aucun produit/abonnement Stripe créé ; la future activation reposera sur vérification serveur et webhooks signés idempotents (voir DEPLOIEMENT-X3.md §8).

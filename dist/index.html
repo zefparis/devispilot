@@ -46,6 +46,7 @@
     <a href="#methode">La méthode</a>
     <a href="#offre">L'offre</a>
     <a href="#faq">Questions</a>
+    <button class="btn btn-quiet btn-sm" data-auth>Se connecter</button>
     <button class="btn btn-dark btn-sm" data-open>Tester la démo</button>
   </nav>
 </header>
@@ -58,7 +59,7 @@
       <p class="lead">DevisPilot est le cockpit de suivi commercial des petites entreprises du confort thermique. Voyez quels devis attendent, préparez le bon message et gardez la trace de chaque échange.</p>
       <div class="actions">
         <button class="btn btn-primary" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
-        <a class="btn btn-quiet" href="#offre">Voir l'offre pilote</a>
+        <button class="btn btn-outline" data-auth>Se connecter</button>
       </div>
       <p class="subtle">Démo sans inscription · données fictives · aucun envoi automatique</p>
       <ul class="hero-tags" aria-label="Métiers concernés">
@@ -135,21 +136,26 @@
 
   <section class="offer" id="offre">
     <div class="offer-copy">
-      <p class="eyebrow eyebrow-light"><i></i>Proposition pilote · à valider avec vous</p>
+      <p class="eyebrow eyebrow-light"><i></i>Offres pilote · à valider avec vous</p>
       <h2>Un démarrage accompagné, pas un logiciel de plus.</h2>
       <p>Nous reprenons vos devis en cours, paramétrons vos modèles de relance et installons votre rituel de suivi. Ensuite, un point mensuel pour ajuster la méthode.</p>
-      <p class="offer-note">Cette offre est une hypothèse commerciale en cours de validation. Le prototype que vous testez illustre le parcours : la vente du service sera ouverte après mise en place du paiement et des conditions contractuelles.</p>
+      <p class="offer-note">Ces offres sont des hypothèses commerciales en cours de validation. Les fonctionnalités et limites exactes de chaque plan restent à définir avec les premiers pilotes ; aucun paiement n'est encore ouvert.</p>
     </div>
-    <div class="price" aria-label="Tarifs de l'offre pilote">
-      <p class="price-label">Le pilote accompagné</p>
-      <p class="price-main"><strong>290 €</strong> HT <span>de mise en route</span></p>
-      <p class="price-sub">puis <strong>79 €</strong> HT / mois</p>
-      <ul>
-        <li><svg class="icon"><use href="#i-check"/></svg>Un espace de suivi pour votre entreprise</li>
-        <li><svg class="icon"><use href="#i-check"/></svg>Reprise de vos devis et import CSV</li>
-        <li><svg class="icon"><use href="#i-check"/></svg>Modèles de messages adaptés à votre ton</li>
-        <li><svg class="icon"><use href="#i-check"/></svg>Point mensuel avec un humain</li>
-      </ul>
+    <div class="price" aria-label="Tarifs des offres pilotes">
+      <p class="price-label">Offres pilote</p>
+      <div class="price-plans">
+        <div class="price-plan">
+          <strong>Solo</strong>
+          <p><b>19 €</b> HT / mois</p>
+          <small>Pour un artisan seul</small>
+        </div>
+        <div class="price-plan">
+          <strong>Équipe</strong>
+          <p><b>39 €</b> HT / mois</p>
+          <small>Pour plusieurs suivis en parallèle</small>
+        </div>
+      </div>
+      <p class="price-sub">Installation accompagnée facultative : <strong>99 €</strong> HT — reprise de vos devis, réglages et formation courte.</p>
       <button class="btn btn-primary btn-block" data-open>Tester la démo<svg class="icon"><use href="#i-arrow"/></svg></button>
       <button class="btn btn-quiet btn-block" id="buy">Vérifier la disponibilité de l'offre</button>
       <small id="payment-note" class="price-note">Paiement non configuré · aucun prélèvement</small>
@@ -197,6 +203,90 @@
   </footer>
 </main>
 
+<!-- ==================== CONNEXION / INSCRIPTION ==================== -->
+<section id="auth" hidden aria-label="Connexion à votre espace">
+  <div class="auth-wrap">
+    <a class="brand" href="#" id="auth-home">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+      devispilot
+    </a>
+    <div class="auth-card">
+      <p class="eyebrow"><i></i>Espace entreprise</p>
+      <h1 class="auth-title">Votre suivi, sur votre compte.</h1>
+      <p class="auth-sub" id="auth-sub">Connectez-vous pour retrouver vos devis. Les données sont conservées côté serveur, par entreprise.</p>
+
+      <div class="auth-tabs" id="auth-tabs" hidden>
+        <button class="auth-tab active" id="tab-login" type="button">Connexion</button>
+        <button class="auth-tab" id="tab-signup" type="button" hidden>Créer un compte</button>
+      </div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="l-email">Email professionnel</label>
+          <input id="l-email" name="email" type="email" required autocomplete="email" placeholder="vous@entreprise.fr">
+        </div>
+        <div class="field">
+          <label for="l-pass">Mot de passe</label>
+          <input id="l-pass" name="password" type="password" required autocomplete="current-password" placeholder="••••••••••">
+        </div>
+        <p class="field-error" id="err-login" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="login-btn">Se connecter</button>
+      </form>
+
+      <form id="signup-form" hidden novalidate>
+        <div class="field">
+          <label for="s-name">Votre nom</label>
+          <input id="s-name" name="name" required maxlength="100" autocomplete="name" placeholder="Ex. Karim Benali">
+        </div>
+        <div class="field">
+          <label for="s-company">Nom de l'entreprise</label>
+          <input id="s-company" name="company" required maxlength="100" placeholder="Ex. Atelier Confort">
+        </div>
+        <div class="field">
+          <label for="s-email">Email professionnel</label>
+          <input id="s-email" name="email" type="email" required autocomplete="email" placeholder="vous@entreprise.fr">
+        </div>
+        <div class="field">
+          <label for="s-pass">Mot de passe <span class="opt">(10 caractères minimum)</span></label>
+          <input id="s-pass" name="password" type="password" required minlength="10" autocomplete="new-password" placeholder="••••••••••">
+        </div>
+        <p class="field-error" id="err-signup" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="signup-btn">Créer mon compte</button>
+        <p class="subtle">Le compte créé ouvre un espace isolé pour votre entreprise.</p>
+      </form>
+
+      <p class="auth-note" id="auth-note" hidden>Phase pilote : les comptes sont créés sur invitation. Demandez vos accès à l'équipe DevisPilot.</p>
+      <div class="auth-alt">
+        <button class="btn btn-quiet btn-sm" data-demo>Explorer la démo sans compte</button>
+        <button class="btn btn-quiet btn-sm" data-landing>← Retour au site</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== CRÉATION D'ENTREPRISE ==================== -->
+<section id="onboard" hidden aria-label="Création de votre entreprise">
+  <div class="auth-wrap">
+    <a class="brand" href="#">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></span>
+      devispilot
+    </a>
+    <div class="auth-card">
+      <p class="eyebrow"><i></i>Bienvenue</p>
+      <h1 class="auth-title">Créez votre espace entreprise.</h1>
+      <p class="auth-sub">Vos devis seront rattachés à cette entreprise et isolés des autres comptes.</p>
+      <form id="company-form" novalidate>
+        <div class="field">
+          <label for="c-name">Nom de l'entreprise</label>
+          <input id="c-name" name="name" required maxlength="100" placeholder="Ex. Atelier Confort">
+          <p class="field-error" id="err-company-name" hidden></p>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="company-btn">Créer mon espace</button>
+      </form>
+    </div>
+  </div>
+</section>
+
 <!-- ==================== COCKPIT ==================== -->
 <section id="app" hidden aria-label="Cockpit DevisPilot">
 
@@ -225,15 +315,19 @@
       </button>
     </nav>
     <div class="aside-bottom">
-      <p class="storage-note"><svg class="icon"><use href="#i-info"/></svg>Données stockées dans ce navigateur uniquement.</p>
+      <p class="storage-note" id="storage-note"><svg class="icon"><use href="#i-info"/></svg>Données stockées dans ce navigateur uniquement.</p>
       <button id="back" class="nav-item"><svg class="icon"><use href="#i-back"/></svg><span>Retour à la présentation</span></button>
+      <button id="logout" class="nav-item" hidden><svg class="icon"><use href="#i-x"/></svg><span>Se déconnecter</span></button>
     </div>
   </aside>
 
   <div class="app-main">
     <div class="app-top">
       <span class="crumb">Votre espace commercial <span aria-hidden="true">/</span> <b id="breadcrumb">Vue d'ensemble</b></span>
-      <span class="avatar" id="top-avatar">AC</span>
+      <div class="app-top-right">
+        <button class="btn btn-quiet btn-sm" id="session-btn" hidden>Se déconnecter</button>
+        <span class="avatar" id="top-avatar">AC</span>
+      </div>
     </div>
 
     <div class="notice" id="notice" role="status">
@@ -314,7 +408,7 @@
           <button class="btn btn-primary" id="empty-add"><svg class="icon"><use href="#i-plus"/></svg>Ajouter un devis</button>
         </div>
 
-        <p class="table-note">Les devis « signés » sont déclaratifs : aucun montant n'est présenté comme encaissé. Le pilote ne vérifie pas les paiements.</p>
+        <p class="table-note">Les devis « signés » sont déclaratifs : aucun montant n'est présenté comme encaissé. Aucun paiement n'est connecté dans ce pilote.</p>
       </div>
     </div>
 
@@ -356,7 +450,7 @@
           <div class="field">
             <label for="f-stripe">Lien Stripe Payment Link de votre offre <span class="opt">(optionnel)</span></label>
             <input id="f-stripe" name="stripe" type="url" placeholder="https://buy.stripe.com/…" aria-describedby="stripe-hint err-stripe">
-            <p class="field-hint" id="stripe-hint">Créez dans Stripe une page à 290 € HT de mise en route puis 79 € HT/mois. Aucune clé secrète n'est demandée ni stockée ici.</p>
+            <p class="field-hint" id="stripe-hint">Lien de paiement hébergé par Stripe correspondant à vos offres pilotes (Solo 19 € HT/mois, Équipe 39 € HT/mois, installation 99 € HT). Aucune clé secrète n'est demandée ni stockée ici.</p>
             <p class="field-error" id="err-stripe" hidden></p>
           </div>
           <div class="form-actions">
@@ -376,7 +470,7 @@
               <li>Mesurer le temps de suivi, les réponses et les devis signés sur 30 jours.</li>
             </ol>
             <div class="math">
-              <strong>10 clients × 79 € = 790 €</strong>
+              <strong>20 clients Solo × 19 € = 380 €</strong>
               <p>de revenu mensuel récurrent HT <em>théorique</em>, avant frais Stripe, hébergement, accompagnement, acquisition et impôts.</p>
             </div>
             <p class="subtle">Avant ouverture publique : stockage serveur isolé par entreprise, authentification, vérification des abonnements par webhook Stripe, CGV, confidentialité et suppression des données.</p>
@@ -515,6 +609,39 @@
       </div>
       <button id="done" class="btn btn-outline">J'ai envoyé la relance</button>
     </div>
+  </div>
+</dialog>
+
+<dialog id="migrate" aria-labelledby="migrate-title">
+  <div class="dialog-head">
+    <div>
+      <p class="eyebrow"><i></i>Devis trouvés sur cet appareil</p>
+      <h2 id="migrate-title">Importer vos devis locaux&nbsp;?</h2>
+    </div>
+    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <p class="confirm-text" id="migrate-text"></p>
+  <ul class="migrate-preview" id="migrate-preview"></ul>
+  <p class="subtle">L'import est idempotent : relancer ne crée pas de doublons. Votre copie locale n'est pas supprimée automatiquement.</p>
+  <div class="dialog-footer">
+    <button class="btn btn-quiet" id="migrate-later">Plus tard</button>
+    <button class="btn btn-quiet" id="migrate-dismiss">Ne plus proposer</button>
+    <button class="btn btn-primary" id="migrate-go">Importer</button>
+  </div>
+</dialog>
+
+<dialog id="migrate-result" aria-labelledby="migrate-result-title">
+  <div class="dialog-head">
+    <div>
+      <p class="eyebrow"><i></i>Bilan de l'import</p>
+      <h2 id="migrate-result-title">Import terminé</h2>
+    </div>
+    <button type="button" class="btn-icon" data-close aria-label="Fermer"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <p class="confirm-text" id="migrate-result-text"></p>
+  <div class="dialog-footer">
+    <button class="btn btn-danger btn-sm" id="migrate-delete-local" hidden>Supprimer la copie locale</button>
+    <button class="btn btn-primary" data-close>Fermer</button>
   </div>
 </dialog>
 

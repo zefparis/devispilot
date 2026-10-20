@@ -1,9 +1,16 @@
 'use strict';
 
-/* ---------- Utilitaires ---------- */
+/* ============================================================
+   DevisPilot — frontend
+   Deux modes strictement séparés :
+   - « demo » : données fictives en mémoire, rien n'est envoyé au serveur ;
+   - « live » : toutes les données passent par l'API (session cookie HttpOnly).
+   ============================================================ */
+
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const KEY = 'devispilot-v1';
+const LEGACY_KEY = 'devispilot-v1';      // ancien stockage local (migration)
+const MIG_DISMISS = 'dp-mig-dismissed';
 
 const day = d => {
   const a = new Date();
@@ -19,9 +26,17 @@ const labels = { sent: 'Envoyé', replied: 'Réponse reçue', won: 'Signé', los
 const statusIcon = { sent: 'i-send', replied: 'i-msg', won: 'i-check', lost: 'i-x' };
 const icon = (id, cls = 'icon') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 
-/* ---------- Données ---------- */
+/* ---------- État global ---------- */
+let mode = 'landing';            // 'landing' | 'demo' | 'live'
+let session = null;              // { user, company } en mode live
+let signupEnabled = false;
+function emptyState() {
+  return { settings: { company: 'Atelier Confort', signature: 'Votre artisan', stripe: '' }, quotes: [] };
+}
+let state = emptyState();
+
 function seedQuotes() {
-  const demo = (q) => ({ ...q, id: crypto.randomUUID(), email: '', history: [], seed: true });
+  const demo = q => ({ ...q, id: crypto.randomUUID(), email: '', history: [], seed: true });
   return [
     demo({ client: 'Maison Laurent', project: 'Installation pompe à chaleur', amount: 6480, sent: day(-7), next: day(-1), status: 'sent', notes: 'Exemple fictif. Valider les disponibilités pour une visite.' }),
     demo({ client: 'Résidence des Oliviers', project: 'Climatisation réversible · 3 unités', amount: 4250, sent: day(-10), next: day(0), status: 'replied', notes: 'Exemple fictif. Une question sur le niveau sonore.' }),
@@ -31,55 +46,7 @@ function seedQuotes() {
     demo({ client: 'Studio des Vignes', project: 'Installation monosplit', amount: 1850, sent: day(-20), next: day(0), status: 'lost', notes: 'Exemple fictif. Projet reporté.' }),
   ];
 }
-const seed = () => ({ settings: { company: 'Atelier Confort', signature: 'Votre artisan', stripe: '' }, quotes: seedQuotes() });
-
-function validLink(v) {
-  try {
-    const u = new URL(v);
-    return u.protocol === 'https:' && u.hostname === 'buy.stripe.com' && !u.username && !u.password;
-  } catch { return false; }
-}
-
-/* Normalise + migre l'ancien format : les données v1 gagnent le marquage
-   `seed` (exemples détectés via la note « Exemple fictif ») et `history`. */
-function normalize(x) {
-  if (!x || !Array.isArray(x.quotes) || !x.settings) throw Error();
-  const legacyDemo = x.demo === true;
-  const quotes = x.quotes
-    .filter(q => q && typeof q.id === 'string' && typeof q.client === 'string'
-      && typeof q.project === 'string' && Number.isFinite(q.amount) && q.amount > 0
-      && Object.hasOwn(labels, q.status) && isDate(q.next) && isDate(q.sent))
-    .map(q => ({
-      id: q.id, client: q.client, email: String(q.email || ''),
-      project: q.project, amount: q.amount, sent: q.sent, next: q.next,
-      status: q.status, notes: String(q.notes || ''),
-      history: Array.isArray(q.history) ? q.history.filter(h => h && typeof h.at === 'string') : [],
-      seed: q.seed === true || (legacyDemo && /exemple fictif/i.test(q.notes || '')),
-    }));
-  return {
-    settings: {
-      company: String(x.settings.company || 'Mon entreprise').slice(0, 100),
-      signature: String(x.settings.signature || 'Votre artisan').slice(0, 100),
-      stripe: validLink(x.settings.stripe) ? x.settings.stripe : '',
-    },
-    quotes,
-  };
-}
-
-let state;
-try {
-  const raw = localStorage.getItem(KEY);
-  state = raw ? normalize(JSON.parse(raw)) : seed();
-} catch { state = seed(); }
-
-function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
-  catch { toast('Sauvegarde locale indisponible. Exportez vos données avant de fermer.', 'error'); return false; }
-}
-
-const hasSeed = () => state.quotes.some(q => q.seed);
-const active = q => ['sent', 'replied'].includes(q.status);
-const due = () => state.quotes.filter(q => active(q) && q.next <= day(0)).sort((a, b) => a.next.localeCompare(b.next));
+const demoState = () => ({ settings: { company: 'Atelier Confort', signature: 'Votre artisan', stripe: '' }, quotes: seedQuotes() });
 
 /* ---------- Toast ---------- */
 let toastTimer;
@@ -90,6 +57,12 @@ function toast(text, type = 'success') {
   t.className = `show t-${type}`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+}
+
+/* Protection anti double-soumission */
+function busy(el) {
+  el.disabled = true; el.classList.add('is-busy');
+  return () => { el.disabled = false; el.classList.remove('is-busy'); };
 }
 
 /* ---------- Dialogue de confirmation ---------- */
@@ -114,24 +87,74 @@ $$('dialog').forEach(d => d.addEventListener('click', e => {
   if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
 }));
 
-/* ---------- Navigation ---------- */
-function openApp() {
-  $('.site-header').hidden = true;
-  $('#landing').hidden = true;
-  $('#app').hidden = false;
+/* ---------- Couche API ---------- */
+async function api(path, { method = 'GET', body } = {}) {
+  const r = await fetch('/api' + path, {
+    method,
+    credentials: 'same-origin',
+    headers: {
+      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+      'x-devispilot-client': '1',
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  let data = null;
+  try { data = await r.json(); } catch { /* réponse vide */ }
+  if (!r.ok) {
+    const err = Object.assign(new Error(data?.error || 'Erreur serveur.'), { status: r.status });
+    if (r.status === 401 && mode === 'live') {
+      session = null; mode = 'landing';
+      showAuth('Votre session a expiré. Reconnectez-vous.');
+    }
+    throw err;
+  }
+  return data;
+}
+
+/* Recharge les données serveur (live uniquement) */
+async function refresh() {
+  const [{ quotes }, st] = await Promise.all([api('/quotes'), api('/settings')]);
+  state.quotes = quotes.map(q => ({ ...q, fups: Number(q.followup_count) || 0 }));
+  state.settings = { company: st.company, signature: st.signature, stripe: st.stripe_link };
+}
+
+/* ---------- Navigation entre vues ---------- */
+function show(view) {
+  $('.site-header').hidden = view !== 'landing';
+  $('#landing').hidden = view !== 'landing';
+  $('#auth').hidden = view !== 'auth';
+  $('#onboard').hidden = view !== 'onboard';
+  $('#app').hidden = view !== 'app';
   window.scrollTo(0, 0);
+}
+function openDemo() {
+  mode = 'demo';
+  state = demoState();
+  show('app');
   render();
 }
-function closeApp() {
-  $('.site-header').hidden = false;
-  $('#landing').hidden = false;
-  $('#app').hidden = true;
-  window.scrollTo(0, 0);
+async function enterLive() {
+  try { await refresh(); } catch (e) { return toast(e.message, 'error'); }
+  show('app');
+  render();
+  maybeMigrate();
 }
-$$('[data-open]').forEach(b => b.onclick = openApp);
-$('#back').onclick = closeApp;
-$('#back-m').onclick = closeApp;
-$('#brand-home').onclick = e => { e.preventDefault(); closeApp(); };
+$$('[data-open]').forEach(b => b.onclick = () => mode === 'live' ? enterLive() : openDemo());
+$$('[data-demo]').forEach(b => b.onclick = openDemo);
+$$('[data-auth]').forEach(b => b.onclick = () => showAuth());
+$$('[data-landing]').forEach(b => b.onclick = () => show('landing'));
+$('#back').onclick = () => { if (mode === 'demo') state = emptyState(); show('landing'); };
+$('#back-m').onclick = () => { if (mode === 'demo') state = emptyState(); show('landing'); };
+$('#brand-home').onclick = e => { e.preventDefault(); $('#back').click(); };
+$('#auth-home').onclick = e => { e.preventDefault(); show('landing'); };
+$('#session-btn').onclick = async () => {
+  if (mode === 'demo') { state = emptyState(); mode = 'landing'; show('landing'); return; }
+  try { await api('/auth/sign-out', { method: 'POST', body: {} }); } catch { /* session déjà close */ }
+  session = null; mode = 'landing'; state = emptyState();
+  show('landing');
+  toast('Vous êtes déconnecté.', 'info');
+};
+$('#logout').onclick = () => $('#session-btn').click();
 
 const tabNames = { pipeline: "Vue d'ensemble", followups: 'Relances à préparer', settings: 'Offre & réglages' };
 function tab(id) {
@@ -141,11 +164,91 @@ function tab(id) {
   render();
   window.scrollTo(0, 0);
 }
-/* Les data-tab sont gérés par délégation dans le listener global (éléments dynamiques inclus). */
+/* data-tab géré par délégation (éléments dynamiques inclus) — voir listener global. */
+
+/* ---------- Authentification ---------- */
+function showAuth(msg) {
+  show('auth');
+  $('#login-form').hidden = false;
+  if (msg) toast(msg, 'info');
+}
+$('#tab-login').onclick = () => {
+  $('#tab-login').classList.add('active'); $('#tab-signup').classList.remove('active');
+  $('#login-form').hidden = false; $('#signup-form').hidden = true;
+};
+$('#tab-signup').onclick = () => {
+  $('#tab-signup').classList.add('active'); $('#tab-login').classList.remove('active');
+  $('#signup-form').hidden = false; $('#login-form').hidden = true;
+};
+
+async function afterAuth() {
+  const me = await api('/me');
+  session = me;
+  if (!me?.company) { show('onboard'); return; }
+  mode = 'live';
+  await enterLive();
+}
+
+$('#login-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#login-btn')), err = $('#err-login');
+  err.hidden = true;
+  try {
+    await api('/auth/sign-in/email', { method: 'POST', body: { email: f.elements.email.value.trim(), password: f.elements.password.value } });
+    f.reset();
+    await afterAuth();
+  } catch (err2) {
+    err.hidden = false;
+    err.textContent = err2.status === 401 ? 'Email ou mot de passe incorrect.' : (err2.message || 'Connexion impossible.');
+  } finally { unbusy(); }
+};
+
+$('#signup-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#signup-btn')), err = $('#err-signup');
+  err.hidden = true;
+  const payload = {
+    name: f.elements.name.value.trim(),
+    email: f.elements.email.value.trim(),
+    password: f.elements.password.value,
+  };
+  if (payload.password.length < 10) { err.hidden = false; err.textContent = 'Mot de passe : 10 caractères minimum.'; unbusy(); return; }
+  try {
+    await api('/auth/sign-up/email', { method: 'POST', body: payload });
+    const me = await api('/me');
+    session = me;
+    const c = await api('/companies', { method: 'POST', body: { name: f.elements.company.value.trim() } });
+    session.company = c;
+    f.reset();
+    mode = 'live';
+    await enterLive();
+    toast('Espace créé. Bienvenue !');
+  } catch (err2) {
+    err.hidden = false;
+    err.textContent = err2.status === 422 ? 'Cet email est déjà utilisé.' : (err2.message || 'Inscription impossible.');
+  } finally { unbusy(); }
+};
+
+$('#company-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, unbusy = busy($('#company-btn')), err = $('#err-company-name');
+  err.hidden = true;
+  try {
+    const c = await api('/companies', { method: 'POST', body: { name: f.elements.name.value.trim() } });
+    session.company = c;
+    mode = 'live';
+    await enterLive();
+  } catch (err2) { err.hidden = false; err.textContent = err2.message; }
+  finally { unbusy(); }
+};
 
 /* ---------- Rendu ---------- */
+const hasSeed = () => state.quotes.some(q => q.seed);
+const active = q => ['sent', 'replied'].includes(q.status);
+const due = () => state.quotes.filter(q => active(q) && q.next <= day(0)).sort((a, b) => a.next.localeCompare(b.next));
+
 function initials(name) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'DP';
+  return String(name || 'DP').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'DP';
 }
 function badge(status) {
   return `<span class="badge badge-${status}">${icon(statusIcon[status])}${labels[status]}</span>`;
@@ -160,46 +263,69 @@ function nextInfo(q) {
     kind: late ? 'late' : today ? 'today' : 'planned',
   };
 }
+const fups = q => q.fups ?? q.history?.length ?? 0;
+
+/* Devis locaux (ancien localStorage) importables — exemples exclus. */
+function localQuotes() {
+  try {
+    const x = JSON.parse(localStorage.getItem(LEGACY_KEY));
+    if (!x?.quotes) return [];
+    // Les exemples (flag seed ou note « Exemple fictif » de l'ancien format) sont exclus.
+    return x.quotes.filter(q => !q.seed && !/exemple fictif/i.test(q.notes || '')
+      && q.client && q.project && Number.isFinite(q.amount) && isDate(q.sent) && isDate(q.next) && labels[q.status]);
+  } catch { return []; }
+}
 
 function render() {
   const open = state.quotes.filter(active);
   const won = state.quotes.filter(q => q.status === 'won');
   const queue = due();
-  const sends = state.quotes.reduce((n, q) => n + q.history.length, 0);
+  const sends = state.quotes.reduce((n, q) => n + fups(q), 0);
 
   $('#today').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
-  /* Indicateurs : rien n'est présenté comme encaissé */
   $('#stats').innerHTML = [
     { icon: 'i-bell', cls: 'highlight', label: 'Relances à préparer', value: queue.length, sub: `${money(queue.reduce((n, q) => n + q.amount, 0))} de devis concernés` },
     { icon: 'i-clock', cls: '', label: 'Devis ouverts', value: money(open.reduce((n, q) => n + q.amount, 0)), sub: `${open.length} devis en attente de réponse` },
     { icon: 'i-check', cls: '', label: 'Devis signés (déclarés)', value: money(won.reduce((n, q) => n + q.amount, 0)), sub: `${won.length} signature(s) · paiement non vérifié` },
-    { icon: 'i-info', cls: 'neutral', label: 'Paiements vérifiés', value: '0 €', sub: 'Non suivi dans ce pilote' },
+    { icon: 'i-info', cls: 'neutral', label: 'Paiements non connectés', value: '—', sub: 'Aucune intégration de paiement active' },
   ].map(s => `<article class="stat ${s.cls}">
       <div class="stat-head">${icon(s.icon)}<p>${s.label}</p></div>
       <strong>${s.value}</strong><small>${s.sub}</small>
     </article>`).join('');
 
-  /* Bandeau données : exemples vs données personnelles */
-  const seedN = state.quotes.filter(q => q.seed).length;
-  const ownN = state.quotes.length - seedN;
+  /* Bandeau contextuel */
   const notice = $('#notice'), label = $('#data-label'), text = $('#notice-text'), act = $('#notice-action');
-  notice.classList.toggle('local', seedN === 0);
-  if (seedN && ownN) {
-    label.textContent = 'Exemples + vos devis';
-    text.textContent = `${seedN} devis fictifs et ${ownN} devis à vous sont mélangés. Vous pouvez retirer les exemples sans perdre vos données.`;
-    act.textContent = 'Retirer les exemples';
-  } else if (seedN) {
-    label.textContent = 'Données de démonstration';
-    text.textContent = 'Tout est fictif et stocké uniquement sur cet appareil. Ajoutez votre premier devis quand vous êtes prêt.';
-    act.textContent = 'Retirer les exemples';
+  const localCount = mode === 'live' ? localQuotes().length : 0;
+  notice.classList.toggle('local', mode !== 'demo' && !hasSeed());
+  if (mode === 'demo') {
+    label.textContent = 'Mode démo · données fictives';
+    text.textContent = 'Exploration libre : rien n’est enregistré ni envoyé au serveur.';
+    act.textContent = 'Se connecter';
+    act.onclick = () => showAuth();
+  } else if (localCount && !localStorage.getItem(MIG_DISMISS)) {
+    label.textContent = 'Migration disponible';
+    text.textContent = `${localCount} devis conservés sur cet appareil peuvent rejoindre votre espace serveur.`;
+    act.textContent = 'Importer mes devis locaux';
+    act.onclick = () => openMigrate(localCount);
   } else {
-    label.textContent = 'Données locales';
-    text.textContent = state.quotes.length
-      ? 'Vos devis sont stockés dans ce navigateur uniquement, sans synchronisation.'
-      : 'Aucun devis. Ajoutez votre première opportunité ou chargez les exemples.';
-    act.textContent = 'Charger les exemples';
+    label.textContent = `Connecté · ${state.settings.company}`;
+    text.textContent = 'Données sauvegardées côté serveur, isolées par entreprise.';
+    act.hidden = true;
+    act.textContent = '';
   }
+  if (!(mode === 'demo') && !(localCount && !localStorage.getItem(MIG_DISMISS))) act.hidden = true;
+  else act.hidden = false;
+
+  /* Éléments démo vs live */
+  $('#storage-note').innerHTML = mode === 'demo'
+    ? `${icon('i-info')}Mode démo : données fictives en mémoire, rien n'est envoyé au serveur.`
+    : `${icon('i-info')}Données serveur · session sécurisée, isolée par entreprise.`;
+  $('#logout').hidden = mode !== 'live';
+  $('#session-btn').hidden = false;
+  $('#session-btn').textContent = mode === 'demo' ? 'Quitter la démo' : 'Se déconnecter';
+  $('#remove-seed').closest('.form-panel').hidden = mode === 'live';
+  $('#reset').hidden = $('#clear').hidden = $('#remove-seed').hidden = mode === 'live';
 
   /* Bande relances du jour + badges nav */
   const strip = $('#due-strip');
@@ -223,14 +349,13 @@ function render() {
 
   renderRows();
 
-  /* File de relances */
   $('#queue').innerHTML = queue.length ? queue.map(q => `
     <article class="queue-card">
       <div>
         <p class="eyebrow">${q.next < day(0) ? 'Suivi en retard' : 'À suivre aujourd’hui'}</p>
         <h3>${esc(q.client)}</h3>
         <p class="q-meta">${esc(q.project)} · ${money(q.amount)} HT · devis envoyé le ${fmtDate(q.sent)}</p>
-        <p class="q-notes">${icon('i-msg')}${esc(q.notes || 'Aucune note')} · ${q.history.length} relance(s) déclarée(s)</p>
+        <p class="q-notes">${icon('i-msg')}${esc(q.notes || 'Aucune note')} · ${fups(q)} relance(s) déclarée(s)</p>
       </div>
       <button class="btn btn-primary" data-compose="${esc(q.id)}">Préparer la relance</button>
     </article>`).join('')
@@ -243,9 +368,11 @@ function render() {
 
   /* Réglages */
   const f = $('#settings-form');
-  f.elements.company.value = state.settings.company;
-  f.elements.signature.value = state.settings.signature;
-  f.elements.stripe.value = state.settings.stripe;
+  if (document.activeElement?.form !== f) {
+    f.elements.company.value = state.settings.company;
+    f.elements.signature.value = state.settings.signature;
+    f.elements.stripe.value = state.settings.stripe;
+  }
   $('#ws-name').textContent = state.settings.company;
   $('#ws-avatar').textContent = $('#top-avatar').textContent = initials(state.settings.company);
   $('#buy').textContent = state.settings.stripe ? 'Accéder au paiement Stripe' : 'Vérifier la disponibilité de l\'offre';
@@ -275,7 +402,7 @@ function renderRows() {
       <td><strong>${esc(q.client)}</strong><span class="cell-sub">${esc(q.project)}${q.seed ? ' · exemple' : ''}</span></td>
       <td class="amount"><strong>${money(q.amount)}</strong></td>
       <td>${badge(q.status)}</td>
-      <td><span class="${ni.kind === 'late' ? 'due-text' : ni.kind === 'today' ? 'soon-text' : ''}">${ni.text}</span><span class="cell-sub">${ni.sub} · ${q.history.length} relance(s)</span></td>
+      <td><span class="${ni.kind === 'late' ? 'due-text' : ni.kind === 'today' ? 'soon-text' : ''}">${ni.text}</span><span class="cell-sub">${ni.sub} · ${fups(q)} relance(s)</span></td>
       <td><div class="row-actions">
         ${active(q) ? `<button class="btn btn-outline" data-compose="${esc(q.id)}">Relancer</button>` : ''}
         <button class="btn btn-quiet" data-edit="${esc(q.id)}" aria-label="Modifier le devis ${esc(q.client)}">${icon('i-pen')}Modifier</button>
@@ -381,45 +508,51 @@ $('#quote-form').onsubmit = async e => {
   e.preventDefault();
   const f = e.target;
   if (!validateQuote(f)) return;
+  const unbusy = busy(f.querySelector('button[type=submit]'));
   const o = Object.fromEntries(new FormData(f));
   o.amount = Number(o.amount);
   o.client = o.client.trim(); o.project = o.project.trim(); o.email = o.email.trim(); o.notes = o.notes.trim();
   const old = state.quotes.find(q => q.id === o.id);
-  o.id = old?.id || crypto.randomUUID();
-  o.history = old?.history || [];
-  o.seed = old?.seed || false;
-  const firstOwn = !old && hasSeed() && !state.quotes.some(q => !q.seed);
-  if (old) state.quotes = state.quotes.map(q => q.id === o.id ? o : q);
-  else state.quotes.unshift(o);
-  save();
-  $('#editor').close();
-  render();
-  toast(old ? 'Devis mis à jour.' : 'Devis enregistré sur cet appareil.');
-  /* Premier devis personnel : proposer de retirer les exemples */
-  if (firstOwn) {
-    const n = state.quotes.filter(q => q.seed).length;
-    if (await askConfirm('Retirer les exemples ?', `Votre devis est enregistré. Voulez-vous retirer les ${n} devis fictifs de démonstration ? Vos données et vos réglages seront conservés.`, 'Retirer les exemples')) {
-      state.quotes = state.quotes.filter(q => !q.seed);
-      save(); render();
-      toast('Exemples retirés. Vos devis sont conservés.');
+  try {
+    if (mode === 'demo') {
+      o.id = old?.id || crypto.randomUUID();
+      o.history = old?.history || [];
+      o.seed = old?.seed || false;
+      if (old) state.quotes = state.quotes.map(q => q.id === o.id ? o : q);
+      else state.quotes.unshift(o);
+    } else {
+      const body = { client: o.client, email: o.email, project: o.project, amount: o.amount, sent: o.sent, next: o.next, status: o.status, notes: o.notes };
+      if (old) await api(`/quotes/${o.id}`, { method: 'PATCH', body });
+      else await api('/quotes', { method: 'POST', body });
+      await refresh();
     }
-  }
+    $('#editor').close();
+    render();
+    toast(old ? 'Devis mis à jour.' : 'Devis enregistré.');
+  } catch (err) {
+    toast(err.message || 'Enregistrement impossible.', 'error');
+    // La boîte reste ouverte : la saisie est conservée.
+  } finally { unbusy(); }
 };
 
 $('#delete').onclick = async () => {
   const id = $('#quote-form').elements.id.value;
   const q = state.quotes.find(x => x.id === id);
   if (!q) return;
-  if (!await askConfirm('Supprimer ce devis ?', `« ${q.client} — ${q.project} » et son historique local seront définitivement supprimés de cet appareil.`, 'Supprimer')) return;
-  state.quotes = state.quotes.filter(x => x.id !== id);
-  save(); $('#editor').close(); render();
-  toast('Devis supprimé.', 'info');
+  if (!await askConfirm('Supprimer ce devis ?', `« ${q.client} — ${q.project} » et son historique seront définitivement supprimés.`, 'Supprimer')) return;
+  try {
+    if (mode === 'demo') state.quotes = state.quotes.filter(x => x.id !== id);
+    else { await api(`/quotes/${id}`, { method: 'DELETE' }); await refresh(); }
+    $('#editor').close(); render();
+    toast('Devis supprimé.', 'info');
+  } catch (err) { toast(err.message, 'error'); }
 };
 
 /* ---------- Composition de relance ---------- */
-let current = null;
+let current = null, composeKey = null;
 function composeQuote(id) {
   current = id;
+  composeKey = crypto.randomUUID();      // clé d'idempotence : retry sans doublon
   $('#tone').value = 'gentle';
   $('#next-date').value = day(7);
   makeMessage();
@@ -448,67 +581,138 @@ $('#mail').onclick = () => {
   if (!q?.email) return toast('Ajoutez un email au devis, ou copiez le message.', 'info');
   location.href = `mailto:${encodeURIComponent(q.email)}?subject=${encodeURIComponent($('#subject').value)}&body=${encodeURIComponent($('#message').value)}`;
 };
-$('#done').onclick = () => {
+$('#done').onclick = async () => {
   const q = state.quotes.find(q => q.id === current);
   if (!q) return;
   const next = $('#next-date').value;
   if (!isDate(next)) return toast('Choisissez la date du prochain suivi.', 'error');
-  q.history.push({ at: new Date().toISOString(), subject: $('#subject').value });
-  q.next = next;
-  save(); $('#composer').close(); render();
-  toast(`Relance déclarée envoyée. Prochain suivi le ${fmtDate(next)}.`);
+  const unbusy = busy($('#done'));
+  try {
+    if (mode === 'demo') {
+      q.history = q.history || [];
+      q.history.push({ at: new Date().toISOString(), subject: $('#subject').value });
+      q.fups = q.history.length;
+      q.next = next;
+    } else {
+      await api(`/quotes/${current}/followups`, {
+        method: 'POST',
+        body: { subject: $('#subject').value, next, idemKey: composeKey },
+      });
+      await refresh();
+    }
+    $('#composer').close(); render();
+    toast(`Relance déclarée envoyée. Prochain suivi le ${fmtDate(next)}.`);
+  } catch (err) { toast(err.message, 'error'); }
+  finally { unbusy(); }
 };
 
 /* ---------- Réglages ---------- */
-$('#settings-form').onsubmit = e => {
+$('#settings-form').onsubmit = async e => {
   e.preventDefault();
   const f = e.target, s = Object.fromEntries(new FormData(f));
   let ok = true;
   setErr(f.elements.company, $('#err-company'), s.company.trim() ? '' : 'Indiquez le nom de votre entreprise.');
   setErr(f.elements.signature, $('#err-signature'), s.signature.trim() ? '' : 'Indiquez une signature pour vos messages.');
   const stripe = (s.stripe || '').trim();
-  setErr(f.elements.stripe, $('#err-stripe'), !stripe || validLink(stripe) ? '' : 'Lien invalide : utilisez une URL https://buy.stripe.com/…');
-  if (!f.elements.company.value.trim() || !f.elements.signature.value.trim() || (stripe && !validLink(stripe))) ok = false;
+  const stripeOk = !stripe || (() => { try { const u = new URL(stripe); return u.protocol === 'https:' && u.hostname === 'buy.stripe.com'; } catch { return false; } })();
+  setErr(f.elements.stripe, $('#err-stripe'), stripeOk ? '' : 'Lien invalide : utilisez une URL https://buy.stripe.com/…');
+  if (!f.elements.company.value.trim() || !f.elements.signature.value.trim() || !stripeOk) ok = false;
   if (!ok) return;
-  state.settings = { company: s.company.trim(), signature: s.signature.trim(), stripe };
-  save(); render();
-  toast('Paramètres enregistrés. Aucun abonnement activé par cette action.');
+
+  if (mode === 'demo') {
+    state.settings = { company: s.company.trim(), signature: s.signature.trim(), stripe };
+    render();
+    return toast('Paramètres appliqués à la démo (non persistés).', 'info');
+  }
+  const unbusy = busy(f.querySelector('button[type=submit]'));
+  try {
+    await api('/settings', { method: 'PATCH', body: { company: s.company.trim(), signature: s.signature.trim(), stripe } });
+    await refresh(); render();
+    toast('Paramètres enregistrés. Aucun abonnement activé par cette action.');
+  } catch (err) {
+    setErr(f.elements.stripe, $('#err-stripe'), err.status === 400 && /stripe|lien/i.test(err.message) ? err.message : '');
+    toast(err.message, 'error');
+  } finally { unbusy(); }
 };
 $('#settings-form').addEventListener('input', e => {
   const err = $(`#err-${e.target.name}`);
   if (err && !err.hidden) setErr(e.target, err, '');
 });
 $('#buy').onclick = () => {
-  if (state.settings.stripe && validLink(state.settings.stripe)) window.open(state.settings.stripe, '_blank', 'noopener,noreferrer');
-  else { openApp(); tab('settings'); toast('Configurez le Payment Link de votre offre dans les réglages.', 'info'); }
+  if (state.settings.stripe) window.open(state.settings.stripe, '_blank', 'noopener,noreferrer');
+  else { (mode === 'live' ? enterLive : openDemo)(); tab('settings'); toast('Configurez le Payment Link de votre offre dans les réglages.', 'info'); }
 };
 
-/* ---------- Données : exemples / reset / effacement ---------- */
+/* ---------- Exemples (mode démo uniquement) ---------- */
 async function removeSeed() {
   const n = state.quotes.filter(q => q.seed).length;
   if (!n) return toast('Aucun exemple à retirer.', 'info');
-  if (!await askConfirm('Retirer les exemples ?', `Les ${n} devis fictifs seront supprimés. Vos propres devis, votre historique et vos réglages sont conservés.`, 'Retirer les exemples')) return;
+  if (!await askConfirm('Retirer les exemples ?', `Les ${n} devis fictifs seront supprimés de la démo.`, 'Retirer les exemples')) return;
   state.quotes = state.quotes.filter(q => !q.seed);
-  save(); render();
+  render();
   toast('Exemples retirés.');
 }
-$('#notice-action').onclick = () => { hasSeed() ? removeSeed() : loadSeed(); };
 $('#remove-seed').onclick = removeSeed;
 
-async function loadSeed() {
-  if (hasSeed()) return toast('Les exemples sont déjà présents.', 'info');
-  if (!await askConfirm('Charger les exemples ?', 'Six devis fictifs seront ajoutés à votre portefeuille, clairement marqués « exemple ». Vos données existantes ne sont pas modifiées.', 'Charger les exemples')) return;
+$('#reset').onclick = () => {
   state.quotes.push(...seedQuotes());
-  save(); render();
-  toast('Exemples ajoutés.');
-}
-$('#reset').onclick = loadSeed;
+  render();
+  toast('Exemples ajoutés à la démo.');
+};
 
 $('#clear').onclick = async () => {
-  if (!await askConfirm('Effacer toutes les données ?', 'Tous les devis et réglages de cet appareil seront définitivement supprimés. Exportez un CSV au préalable si besoin.', 'Tout effacer')) return;
-  state = { settings: { company: 'Mon entreprise', signature: 'Votre artisan', stripe: '' }, quotes: [] };
-  save(); render();
-  toast('Espace local vidé. Vous pouvez ajouter vos propres devis.', 'info');
+  if (!await askConfirm('Vider la démo ?', 'Tous les devis fictifs affichés seront retirés.', 'Tout effacer')) return;
+  state.quotes = [];
+  render();
+  toast('Démo vidée.', 'info');
+};
+
+/* ---------- Migration localStorage → serveur ---------- */
+function maybeMigrate() {
+  const items = localQuotes();
+  if (!items.length || localStorage.getItem(MIG_DISMISS)) return;
+  openMigrate(items.length);
+}
+function openMigrate(count) {
+  const items = localQuotes();
+  if (!items.length) return;
+  $('#migrate-text').textContent = `${items.length} devis personnels sont enregistrés dans ce navigateur. Ils seront copiés vers l'espace serveur de « ${session?.company?.name ?? 'votre entreprise'} » avec leurs notes et leurs relances déclarées.`;
+  $('#migrate-preview').innerHTML = items.slice(0, 6).map(q =>
+    `<li><span>${esc(q.client)} — ${esc(q.project)}</span><small>${money(q.amount)} HT</small></li>`).join('')
+    + (items.length > 6 ? `<li><span class="subtle">… et ${items.length - 6} autre(s)</span></li>` : '');
+  $('#migrate').showModal();
+}
+$('#migrate-later').onclick = () => $('#migrate').close();
+$('#migrate-dismiss').onclick = () => { localStorage.setItem(MIG_DISMISS, '1'); $('#migrate').close(); toast('Import local masqué. Retrouvez-le via « Importer CSV » ou le rechargement des données.', 'info'); };
+$('#migrate-go').onclick = async () => {
+  const items = localQuotes();
+  const unbusy = busy($('#migrate-go'));
+  try {
+    const payload = items.map(q => ({
+      import_key: `local-${q.id}`,
+      client: q.client, email: q.email || '', project: q.project, amount: q.amount,
+      sent: q.sent, next: q.next, status: q.status, notes: q.notes || '',
+      history: Array.isArray(q.history) ? q.history : [],
+    }));
+    const res = await api('/import', { method: 'POST', body: { quotes: payload } });
+    await refresh();
+    $('#migrate').close();
+    $('#migrate-result-text').textContent =
+      `${res.imported} devis importé(s), ${res.skipped} ignoré(s) (déjà présents)` +
+      (res.errors?.length ? `, ${res.errors.length} ligne(s) en erreur` : '') +
+      '. Votre copie locale est conservée.';
+    $('#migrate-delete-local').hidden = !(res.imported + res.skipped === items.length);
+    $('#migrate-result').showModal();
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+  finally { unbusy(); }
+};
+$('#migrate-delete-local').onclick = async () => {
+  if (!await askConfirm('Supprimer la copie locale ?', 'Les devis de cet appareil seront effacés du navigateur. La copie serveur est déjà enregistrée.', 'Supprimer la copie locale')) return;
+  localStorage.removeItem(LEGACY_KEY);
+  $('#migrate-result').close();
+  render();
+  toast('Copie locale supprimée.', 'info');
 };
 
 /* ---------- CSV ---------- */
@@ -517,16 +721,28 @@ function csvCell(x) {
   if (/^[=+@\-\t\r\n]/.test(s)) s = "'" + s;
   return '"' + s.replaceAll('"', '""') + '"';
 }
-$('#export').onclick = () => {
-  if (!state.quotes.length) return toast('Aucun devis à exporter.', 'info');
-  const keys = ['client', 'email', 'project', 'amount', 'sent', 'status', 'next', 'notes'];
-  const csv = '\uFEFF' + [keys, ...state.quotes.map(q => keys.map(k => q[k]))].map(r => r.map(csvCell).join(';')).join('\r\n');
-
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a');
-  a.href = url; a.download = 'devispilot-devis.csv'; a.click();
+  a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast('Export des devis téléchargé. Historique détaillé non inclus.');
+}
+$('#export').onclick = async () => {
+  if (mode === 'demo') {
+    if (!state.quotes.length) return toast('Aucun devis à exporter.', 'info');
+    const keys = ['client', 'email', 'project', 'amount', 'sent', 'status', 'next', 'notes'];
+    const csv = '\uFEFF' + [keys, ...state.quotes.map(q => keys.map(k => q[k]))].map(r => r.map(csvCell).join(';')).join('\r\n');
+    download('devispilot-devis.csv', csv);
+
+    return toast('Export des devis téléchargé. Historique détaillé non inclus.');
+  }
+  try {
+    const r = await fetch('/api/export.csv', { credentials: 'same-origin' });
+    if (r.status === 401) { session = null; mode = 'landing'; showAuth('Votre session a expiré.'); return; }
+    if (!r.ok) throw new Error('Export impossible.');
+    download('devispilot-devis.csv', await r.text());
+    toast('Export des devis téléchargé. Historique détaillé non inclus.');
+  } catch (err) { toast(err.message, 'error'); }
 };
 function parseCSV(text) {
   text = text.replace(/^\uFEFF/, '');
@@ -548,6 +764,13 @@ function parseCSV(text) {
   if (row.some(x => x.trim())) rows.push(row);
   return rows;
 }
+/* Empreinte stable de ligne → import CSV idempotent. */
+function rowKey(q) {
+  let h = 0x811c9dc5;
+  const s = [q.client, q.email, q.project, q.amount, q.sent, q.status, q.next].join('|');
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return 'csv-' + (h >>> 0).toString(36);
+}
 $('#import').onclick = () => $('#csv').click();
 $('#csv').onchange = async e => {
   const file = e.target.files[0];
@@ -559,7 +782,7 @@ $('#csv').onchange = async e => {
     if (!header || !rows.length) throw Error('Le CSV ne contient pas de devis.');
     const keys = header.map(s => s.trim().toLowerCase());
     for (const k of ['client', 'project', 'amount', 'sent', 'status', 'next'])
-      if (!keys.includes(k)) throw Error('Colonnes requises : client, project, amount, sent, status, next. Exportez la démo pour obtenir le modèle.');
+      if (!keys.includes(k)) throw Error('Colonnes requises : client, project, amount, sent, status, next. Exportez le modèle pour obtenir le format.');
     if (rows.length > 2000) throw Error('Maximum 2 000 lignes par import.');
     const incoming = rows.map((r, i) => {
       const q = Object.fromEntries(keys.map((k, j) => [k, (r[j] || '').trim()]));
@@ -569,13 +792,42 @@ $('#csv').onchange = async e => {
         || !Object.hasOwn(labels, q.status)
         || ![q.sent, q.next].every(isDate))
         throw Error('Données invalides à la ligne ' + (i + 2) + '. Aucun devis importé.');
-      return { ...q, email: (q.email || '').slice(0, 200), notes: (q.notes || '').slice(0, 2000), id: crypto.randomUUID(), history: [], seed: false };
+      return {
+        import_key: rowKey(q),
+        client: q.client, email: (q.email || '').slice(0, 200), project: q.project,
+        amount: q.amount, sent: q.sent, next: q.next, status: q.status,
+        notes: (q.notes || '').slice(0, 2000), history: [],
+      };
     });
-    if (!await askConfirm('Importer ces devis ?', `${incoming.length} devis seront ajoutés à votre portefeuille${hasSeed() ? ' et remplaceront les exemples' : ''}. Un second import du même fichier créera des doublons.`, 'Importer')) return;
-    state.quotes = [...state.quotes.filter(q => !q.seed), ...incoming];
-    save(); render();
-    toast(incoming.length + ' devis importés.');
+    if (!await askConfirm('Importer ces devis ?', `${incoming.length} devis seront ajoutés à votre portefeuille. L'import est idempotent : relancer le même fichier ne crée pas de doublons.`, 'Importer')) return;
+
+    if (mode === 'demo') {
+      incoming.forEach(q => state.quotes.unshift({ ...q, id: crypto.randomUUID(), history: [], fups: 0 }));
+      render();
+      return toast(incoming.length + ' devis importés dans la démo.');
+    }
+    const res = await api('/import', { method: 'POST', body: { quotes: incoming } });
+    await refresh(); render();
+    toast(`${res.imported} devis importé(s), ${res.skipped} ignoré(s)` + (res.errors?.length ? `, ${res.errors.length} erreur(s)` : '') + '.');
   } catch (err) { toast(err.message, 'error'); }
 };
 
-render();
+/* ---------- Démarrage ---------- */
+(async function boot() {
+  try {
+    const c = await api('/config');
+    signupEnabled = !!c.signupEnabled;
+  } catch { signupEnabled = false; }
+  $('#auth-tabs').hidden = !signupEnabled;
+  $('#tab-signup').hidden = !signupEnabled;
+  $('#auth-note').hidden = signupEnabled;
+  try {
+    const me = await api('/me');
+    if (me?.user) {
+      session = me;
+      if (me.company) { mode = 'live'; await refresh(); render(); }
+      else { show('onboard'); return; }
+    }
+  } catch { /* pas de session : rester sur la page commerciale */ }
+  render();
+})();
