@@ -212,6 +212,14 @@ docker logs -f devispilot-db
 docker compose ps
 ```
 
+**Rejeu d'un événement Stripe** : si un webhook échoue, l'échec est loggué en
+erreur avec l'`event_id` (l'événement reste consommé — anti-boucle). Pour le
+rejouer manuellement depuis l'API Stripe :
+
+```bash
+docker compose exec api node dist/replay-event.js evt_xxxxxxxxxxxx
+```
+
 ## 8. Variables Stripe (préparation — rien d'actif)
 
 L'abonnement Perspecta (artisan → nous) n'est **pas** branché : pas de clé

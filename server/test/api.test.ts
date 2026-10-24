@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Stripe from 'stripe';
+import fs from 'node:fs';
 
 // Base de test dédiée (créée au préalable : CREATE DATABASE devispilot_test).
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
@@ -29,6 +30,7 @@ const { migrate, pool } = await import('../src/db.js');
 const { stripe } = await import('../src/stripe.js');
 const { outbox } = await import('../src/mailer.js');
 const { CGV_VERSION } = await import('../src/legal.js');
+const { processStripeEvent } = await import('../src/stripe-events.js');
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 
@@ -678,4 +680,161 @@ test('cgv : pages légales publiques, acceptation exige une session', async () =
   }
   const anon = await app.inject({ method: 'POST', url: '/api/legal/accept', headers: H, payload: { version: CGV_VERSION } });
   assert.equal(anon.statusCode, 401);
+});
+
+/* ---------- Audit : en-têtes de sécurité ---------- */
+test('sécurité : en-têtes posés sur pages et API, CSP sans inline', async () => {
+  for (const url of ['/', '/api/health']) {
+    const r = await app.inject({ method: 'GET', url });
+    assert.equal(r.headers['x-content-type-options'], 'nosniff', url);
+    assert.equal(r.headers['x-frame-options'], 'DENY', url);
+    assert.equal(r.headers['referrer-policy'], 'strict-origin-when-cross-origin', url);
+    assert.ok(r.headers['permissions-policy'], url);
+    assert.ok(String(r.headers['strict-transport-security']).includes('max-age='), url);
+    const csp = String(r.headers['content-security-policy']);
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval/, 'aucune dérogation inline');
+  }
+});
+
+/* ---------- Audit : quota Gratuit atomique ---------- */
+test('quota : 2 créations concurrentes au 10e devis → une seule passe', async () => {
+  const cookie = await signup('race@x.fr');
+  await createCompany(cookie, 'RaceCo');
+  for (let i = 0; i < 9; i++) await addQuote(cookie, { client: `R${i}` });
+  const { rows } = await pool.query(`SELECT id FROM companies WHERE name='RaceCo'`);
+  const cid = rows[0].id;
+
+  // Verrou d'entreprise tenu en parallèle : les deux POST attendent sa
+  // libération, puis se sérialisent → comptage atomique garanti.
+  const hold = await pool.connect();
+  await hold.query('BEGIN');
+  await hold.query('SELECT id FROM companies WHERE id=$1 FOR UPDATE', [cid]);
+  const p1 = app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: { ...ACTIVE_QUOTE, client: 'R9a' } });
+  const p2 = app.inject({ method: 'POST', url: '/api/quotes', headers: { ...H, cookie }, payload: { ...ACTIVE_QUOTE, client: 'R9b' } });
+  await new Promise(r => setTimeout(r, 100));
+  await hold.query('COMMIT');
+  hold.release();
+  const [r1, r2] = await Promise.all([p1, p2]);
+  assert.deepEqual([r1.statusCode, r2.statusCode].sort(), [201, 403], 'un seul devis créé');
+  const { rows: n } = await pool.query(
+    `SELECT count(*) AS n FROM quotes WHERE company_id=$1 AND status IN ('sent','replied')`, [cid]);
+  assert.equal(Number(n[0].n), 10, 'limite respectée');
+});
+
+test('pagination : limit/offset sur /api/quotes, défaut 200', async () => {
+  const cookie = await signup('page@x.fr');
+  await createCompany(cookie, 'PageCo');
+  await addQuote(cookie, { client: 'A' });
+  await addQuote(cookie, { client: 'B' });
+  await addQuote(cookie, { client: 'C' });
+  const l = await app.inject({ method: 'GET', url: '/api/quotes?limit=2', headers: { ...H, cookie } });
+  assert.equal(l.json().quotes.length, 2, 'limit=2');
+  const o = await app.inject({ method: 'GET', url: '/api/quotes?limit=2&offset=2', headers: { ...H, cookie } });
+  assert.equal(o.json().quotes.length, 1, 'offset=2');
+  const over = await app.inject({ method: 'GET', url: '/api/quotes?limit=99999', headers: { ...H, cookie } });
+  assert.equal(over.statusCode, 200, 'limit bornée, pas de rejet');
+  assert.equal(over.json().quotes.length, 3);
+});
+
+/* ---------- Audit : logo — magic bytes ---------- */
+test('logo : magic bytes vérifiés, type déclaré non fiable', async () => {
+  const cookie = await signup('logo@x.fr');
+  await createCompany(cookie, 'LogoCo');
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const put = (mime: string, buf: Buffer) => app.inject({
+    method: 'PUT', url: '/api/company/logo', headers: { ...H, cookie },
+    payload: { data: `data:${mime};base64,${buf.toString('base64')}` },
+  });
+  // Contenu quelconque déclaré image/png → refusé.
+  const fake = await put('image/png', Buffer.from('<html><body>xss</body></html>'));
+  assert.equal(fake.statusCode, 400, `faux PNG → ${fake.statusCode}`);
+  // Vrai PNG déclaré JPEG → refusé (type réel ≠ déclaré).
+  const wrong = await put('image/jpeg', png);
+  assert.equal(wrong.statusCode, 400, `PNG déclaré JPEG → ${wrong.statusCode}`);
+  // Vrai PNG déclaré PNG → accepté.
+  const ok = await put('image/png', png);
+  assert.equal(ok.statusCode, 200, `vrai PNG → ${ok.statusCode}`);
+  const get = await app.inject({ method: 'GET', url: '/api/company/logo', headers: { ...H, cookie } });
+  assert.equal(get.statusCode, 200);
+  assert.equal(get.headers['content-type'], 'image/png');
+  assert.equal(get.headers['x-content-type-options'], 'nosniff', 'anti-sniffing sur le logo');
+});
+
+/* ---------- Audit : webhook — échec loggué + rejeu manuel ---------- */
+test('stripe : échec de traitement consommé (anti-boucle) puis rejeu manuel', async () => {
+  const cookie = await signup('replay@x.fr');
+  await createCompany(cookie, 'ReplayCo');
+  const { rows } = await pool.query(`SELECT id FROM companies WHERE name='ReplayCo'`);
+  const cid = rows[0].id;
+  await pool.query(`UPDATE companies SET stripe_customer_id='cus_replay' WHERE id=$1`, [cid]);
+
+  const sub = {
+    id: 'sub_replay', customer: 'cus_replay', status: 'active',
+    cancel_at_period_end: false, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400,
+    metadata: {}, items: { data: [{ price: { id: 'price_pro_m' } }] },
+  };
+  const ev = { id: 'evt_replay_1', type: 'customer.subscription.updated', data: { object: sub } };
+
+  // Échec simulé pendant le traitement : la première requête métier échoue.
+  const orig = pool.query.bind(pool);
+  let failOnce = true;
+  (pool as any).query = (text: any, ...rest: any[]) => {
+    if (failOnce && typeof text === 'string' && text.includes('FROM companies WHERE stripe_customer_id')) {
+      failOnce = false;
+      return Promise.reject(new Error('échec simulé'));
+    }
+    return orig(text, ...rest);
+  };
+  try {
+    const w = await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(ev) });
+    assert.equal(w.statusCode, 200, 'anti-boucle : 200 malgré l\'échec');
+    assert.equal(w.json().received, true);
+  } finally {
+    (pool as any).query = orig;
+  }
+  // L'event_id est consommé et le traitement n'a pas eu lieu.
+  const { rows: dup } = await pool.query(`SELECT 1 FROM stripe_events WHERE event_id='evt_replay_1'`);
+  assert.equal(dup.length, 1, 'event_id consommé');
+  const { rows: st } = await pool.query('SELECT plan FROM companies WHERE id=$1', [cid]);
+  assert.equal(st[0].plan, 'free', 'plan inchangé après échec');
+
+  // Rejeu manuel : même chemin que replay-event.js (écritures idempotentes).
+  await processStripeEvent(ev, { warn() {}, error() {} });
+  const { rows: st2 } = await pool.query('SELECT plan, subscription_status FROM companies WHERE id=$1', [cid]);
+  assert.equal(st2[0].plan, 'pro', 'rejeu applique l\'abonnement');
+  assert.equal(st2[0].subscription_status, 'active');
+
+  // price_id hors du mapping : événement accepté, plan inchangé (alerte loggée).
+  const ev2 = { id: 'evt_unknown_price', type: 'customer.subscription.updated',
+    data: { object: { ...sub, id: 'sub_unk', items: { data: [{ price: { id: 'price_inconnu' } }] } } } };
+  const w2 = await app.inject({ method: 'POST', url: '/api/stripe/webhook', ...whReq(ev2) });
+  assert.equal(w2.statusCode, 200);
+  const { rows: st3 } = await pool.query('SELECT plan, subscription_price_id FROM companies WHERE id=$1', [cid]);
+  assert.equal(st3[0].plan, 'pro', 'price_id inconnu → plan préservé');
+  assert.equal(st3[0].subscription_price_id, 'price_inconnu', 'le reste de l\'abonnement est bien appliqué');
+});
+
+/* ---------- Audit : invitation admin = un seul email ---------- */
+test('admin : invitation → un seul email (pas de vérification)', async () => {
+  const admin = await ADMIN_COOKIE();
+  const r = await app.inject({ method: 'POST', url: '/api/admin/accounts', headers: { ...H, cookie: admin }, payload: { email: 'single-mail@x.fr', name: 'Invité' } });
+  assert.equal(r.statusCode, 200, r.body);
+  const mails = outbox.filter(m => m.to === 'single-mail@x.fr');
+  assert.equal(mails.length, 1, `un seul email attendu, reçu ${mails.length}`);
+  assert.match(mails[0].subject, /réinitialisation/i, 'le seul email est le lien d\'invitation');
+  // Le compte est utilisable : email déjà vérifié, mot de passe à définir.
+  const token = tokenFrom(mails[0]);
+  assert.ok(token);
+  const { rows } = await pool.query(`SELECT "emailVerified" FROM "user" WHERE email='single-mail@x.fr'`);
+  assert.equal(rows[0].emailVerified, true);
+});
+
+/* ---------- Audit : front — échappement data-id dans l'admin ---------- */
+test('front : identifiants échappés dans le tableau admin (source)', () => {
+  const src = fs.readFileSync(new URL('../../public/app.js', import.meta.url), 'utf8');
+  assert.ok(!src.includes('data-id="${u.id}"'), 'data-id doit passer par esc()');
+  assert.ok(src.includes('data-id="${esc(u.id)}"'), 'data-id échappé présent');
+  assert.ok(!src.includes('style="'), 'aucun style inline (CSP)');
 });

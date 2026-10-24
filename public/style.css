@@ -3,6 +3,8 @@
    Palette : vert profond, ivoire, accent citron vert
    ============================================================ */
 
+.svg-sprite { display: none; }
+
 :root {
   --ink: #152a24;
   --green: #144c3e;
@@ -579,6 +581,7 @@ h3 { font-size: 16px; font-weight: 650; }
 .due-item-main strong { font-size: 14px; display: block; }
 .due-item-main small { font-size: 12px; color: var(--muted); display: block; }
 .due-item .btn { flex-shrink: 0; }
+.due-more { padding-top: 10px; }
 
 /* ---------- Panneau / tableau ---------- */
 .panel {

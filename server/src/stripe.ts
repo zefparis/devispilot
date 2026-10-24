@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import type pg from 'pg';
 import { config } from './config.js';
 import { pool } from './db.js';
 
@@ -89,9 +90,17 @@ export async function activeQuoteCount(companyId: string): Promise<number> {
   return Number(rows[0].n);
 }
 
-// Reste à insérer avant de heurter la limite (Infinity hors plan Gratuit).
-export async function remainingQuoteQuota(companyId: string): Promise<number> {
-  const b = await companyBilling(companyId);
-  if (effectivePlan(b) !== 'free') return Number.POSITIVE_INFINITY;
-  return Math.max(0, FREE_ACTIVE_LIMIT - (await activeQuoteCount(companyId)));
+// Reste à insérer avant de heurter la limite, calculé ATOMIQUEMENT :
+// à appeler à l'intérieur d'une transaction. Verrouille la ligne de
+// l'entreprise (FOR UPDATE) puis compte — deux écritures concurrentes
+// ne peuvent plus dépasser la limite ensemble. Infinity hors Gratuit.
+export async function lockedRemainingQuota(client: pg.PoolClient, companyId: string): Promise<number> {
+  const { rows } = await client.query<Pick<CompanyBilling, 'plan' | 'subscription_status'>>(
+    'SELECT plan, subscription_status FROM companies WHERE id=$1 FOR UPDATE', [companyId]);
+  if (effectivePlan(rows[0] ?? { plan: 'free', subscription_status: 'none' }) !== 'free')
+    return Number.POSITIVE_INFINITY;
+  const { rows: n } = await client.query<{ n: string }>(
+    `SELECT count(*) AS n FROM quotes WHERE company_id=$1 AND status IN ('sent','replied')`,
+    [companyId]);
+  return Math.max(0, FREE_ACTIVE_LIMIT - Number(n[0].n));
 }

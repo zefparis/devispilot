@@ -196,16 +196,18 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { rows: exists } = await pool.query('SELECT 1 FROM "user" WHERE lower(email)=$1', [email]);
     if (exists.length) return reply.code(409).send({ error: 'Un compte existe déjà avec cet email.' });
 
-    // Compte créé avec un mot de passe aléatoire inutilisable ; l'utilisateur
-    // définit le sien via l'email d'invitation (lien de réinitialisation, 1 h).
+    // Compte créé déjà vérifié via l'adaptateur interne (pas par
+    // signUpEmail, qui enverrait un email de vérification en trop) :
+    // le SEUL message envoyé est le lien « définir le mot de passe ».
     try {
-      await auth.api.signUpEmail({ body: { email, password: crypto.randomBytes(24).toString('base64url') + 'Aa1!', name } });
+      const ctx = await auth.$context;
+      const user = await ctx.internalAdapter.createUser({ email, name, emailVerified: true }, { method: 'admin' });
+      const password = await ctx.password.hash(crypto.randomBytes(24).toString('base64url') + 'Aa1!');
+      await ctx.internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password });
     } catch (err) {
       req.log.warn({ err }, 'admin account creation failed');
-      return reply.code(502).send({ error: 'Création impossible (SMTP indisponible ?).' });
+      return reply.code(502).send({ error: 'Création impossible.' });
     }
-    // Compte créé par l'exploitant : considéré comme vérifié d'office.
-    await pool.query('UPDATE "user" SET "emailVerified"=true WHERE lower(email)=$1', [email]);
     try {
       await auth.api.requestPasswordReset({ body: { email, redirectTo: config.frontUrl + '/reinitialiser' } });
     } catch (err) {

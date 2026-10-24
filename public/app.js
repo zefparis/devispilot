@@ -104,7 +104,7 @@ async function api(path, { method = 'GET', body } = {}) {
 
 /* Recharge les données serveur */
 async function refresh() {
-  const [{ quotes }, st] = await Promise.all([api('/quotes'), api('/settings')]);
+  const [{ quotes }, st] = await Promise.all([api('/quotes?limit=500'), api('/settings')]);
   state.quotes = quotes.map(q => ({ ...q, fups: Number(q.followup_count) || 0 }));
   state.settings = { company: st.company, signature: st.signature, stripe: st.stripe_link };
 }
@@ -388,7 +388,7 @@ function render() {
         <span class="badge ${q.next < day(0) ? 'badge-late' : 'badge-due'}">${icon('i-clock')}${q.next < day(0) ? 'En retard' : "Aujourd'hui"}</span>
         <button class="btn btn-outline btn-sm" data-compose="${esc(q.id)}">Préparer</button>
       </div>`;
-    }).join('') + (queue.length > 4 ? `<p class="subtle" style="padding-top:10px">+ ${queue.length - 4} autre(s) dans l'onglet Relances.</p>` : '');
+    }).join('') + (queue.length > 4 ? `<p class="subtle due-more">+ ${queue.length - 4} autre(s) dans l'onglet Relances.</p>` : '');
   } else strip.hidden = true;
 
   renderRows();
@@ -709,14 +709,15 @@ async function loadBilling() {
       return;
     }
     const paid = b.plan !== 'free';
+    let pct = 0;
     let html = `<div class="sub-line">
       <span class="plan-badge${paid ? '' : ' free'}">${PLAN_NAMES[b.plan] ?? b.plan}</span>
       <strong>${STATUS_TXT[b.status] ?? (paid ? 'Abonnement actif' : 'Offre gratuite')}</strong>
     </div>`;
     if (b.usage.limit != null) {
-      const pct = Math.min(100, Math.round(b.usage.active / b.usage.limit * 100));
+      pct = Math.min(100, Math.round(b.usage.active / b.usage.limit * 100));
       html += `<div class="usage">
-        <div class="usage-bar${b.usage.active >= b.usage.limit ? ' full' : ''}"><i style="width:${pct}%"></i></div>
+        <div class="usage-bar${b.usage.active >= b.usage.limit ? ' full' : ''}"><i></i></div>
         <p class="usage-text">${b.usage.active} / ${b.usage.limit} devis actifs utilisés</p>
       </div>`;
     }
@@ -738,6 +739,9 @@ async function loadBilling() {
       html += `<button class="btn btn-quiet btn-sm" data-portal>${paid ? 'Gérer mon abonnement' : 'Portail de facturation'}<svg class="icon"><use href="#i-arrow"/></svg></button>`;
     html += '</div>';
     body.innerHTML = html;
+    // Largeur via CSSOM (les attributs style inline sont bloqués par la CSP).
+    const bar = body.querySelector('.usage-bar > i');
+    if (bar) bar.style.width = pct + '%';
   } catch (e) {
     body.innerHTML = `<p class="form-intro">${esc(e.message || 'Abonnement indisponible.')}</p>`;
   }
@@ -1030,11 +1034,11 @@ async function loadAdminUsers() {
     <td>${new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
     <td>${u.last_seen ? fmtDateTime(u.last_seen) : '—'}</td>
     <td><div class="admin-actions">
-      ${!u.email_verified ? `<button class="btn btn-quiet btn-sm" data-admin-act="verify" data-id="${u.id}" data-email="${esc(u.email)}">Forcer vérif.</button>
-      <button class="btn btn-quiet btn-sm" data-admin-act="resend" data-id="${u.id}" data-email="${esc(u.email)}">Renvoyer l'email</button>` : ''}
-      <button class="btn btn-quiet btn-sm" data-admin-act="${u.suspended_at ? 'reactivate' : 'suspend'}" data-id="${u.id}" data-email="${esc(u.email)}">${u.suspended_at ? 'Réactiver' : 'Suspendre'}</button>
-      <button class="btn btn-quiet btn-sm" data-admin-act="revoke" data-id="${u.id}" data-email="${esc(u.email)}">Révoquer sessions</button>
-      <button class="btn btn-quiet btn-sm" data-admin-act="delete" data-id="${u.id}" data-email="${esc(u.email)}">Supprimer</button>
+      ${!u.email_verified ? `<button class="btn btn-quiet btn-sm" data-admin-act="verify" data-id="${esc(u.id)}" data-email="${esc(u.email)}">Forcer vérif.</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="resend" data-id="${esc(u.id)}" data-email="${esc(u.email)}">Renvoyer l'email</button>` : ''}
+      <button class="btn btn-quiet btn-sm" data-admin-act="${u.suspended_at ? 'reactivate' : 'suspend'}" data-id="${esc(u.id)}" data-email="${esc(u.email)}">${u.suspended_at ? 'Réactiver' : 'Suspendre'}</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="revoke" data-id="${esc(u.id)}" data-email="${esc(u.email)}">Révoquer sessions</button>
+      <button class="btn btn-quiet btn-sm" data-admin-act="delete" data-id="${esc(u.id)}" data-email="${esc(u.email)}">Supprimer</button>
     </div></td>
   </tr>`).join('') || '<tr><td colspan="6" class="subtle">Aucun utilisateur.</td></tr>';
 }

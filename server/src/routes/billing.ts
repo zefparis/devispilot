@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { config } from '../config.js';
+import { processStripeEvent } from '../stripe-events.js';
 import {
   stripe, stripeEnabled, priceInfo, planForPrice, knownPriceIds, visiblePriceEntries,
   companyBilling, effectivePlan, activeQuoteCount, FREE_ACTIVE_LIMIT,
@@ -24,49 +25,6 @@ async function companyContact(companyId: string) {
        LEFT JOIN "user" u ON u.id=m.user_id
       WHERE c.id=$1 LIMIT 1`, [companyId]);
   return rows[0];
-}
-
-async function applySubscription(sub: any): Promise<void> {
-  const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
-  const priceId = sub.items?.data?.[0]?.price?.id ?? null;
-  // current_period_end a migré au niveau de l'item dans les API récentes (Basil).
-  const periodEnd = sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end ?? null;
-  const plan = priceId ? planForPrice(priceId) : undefined;
-  // Résolution : d'abord par customer id, sinon par metadata de l'abonnement.
-  let companyId: string | null = null;
-  if (customerId) {
-    const { rows } = await pool.query<{ id: string }>(
-      'SELECT id FROM companies WHERE stripe_customer_id=$1', [customerId]);
-    companyId = rows[0]?.id ?? null;
-  }
-  const metaId = String(sub.metadata?.company_id ?? '');
-  if (!companyId && /^[0-9a-f-]{36}$/i.test(metaId)) {
-    const { rows } = await pool.query<{ id: string }>(
-      'SELECT id FROM companies WHERE id=$1', [metaId]);
-    companyId = rows[0]?.id ?? null;
-  }
-  if (!companyId) return;
-  await pool.query(
-    `UPDATE companies SET
-       stripe_customer_id = COALESCE($2, stripe_customer_id),
-       subscription_id = $3,
-       subscription_status = $4,
-       ${plan ? 'plan = $5,' : ''}
-       subscription_price_id = COALESCE($6, subscription_price_id),
-       current_period_end = $7,
-       cancel_at_period_end = $8
-     WHERE id = $1`,
-    [companyId, customerId ?? null, sub.id ?? null, sub.status ?? 'none',
-     ...(plan ? [plan] : []), priceId,
-     periodEnd ? new Date(periodEnd * 1000) : null,
-     !!sub.cancel_at_period_end]);
-}
-
-async function companyIdByCustomer(customerId: string | undefined): Promise<string | null> {
-  if (!customerId) return null;
-  const { rows } = await pool.query<{ id: string }>(
-    'SELECT id FROM companies WHERE stripe_customer_id=$1', [customerId]);
-  return rows[0]?.id ?? null;
 }
 
 export default async function billingRoutes(app: FastifyInstance) {
@@ -100,51 +58,16 @@ export default async function billingRoutes(app: FastifyInstance) {
         [event.id, event.type ?? '']);
       if (!rowCount) return { received: true, duplicate: true };
 
-      const obj = event.data?.object ?? {};
       try {
-        switch (event.type) {
-          case 'checkout.session.completed': {
-            const companyId = obj.client_reference_id || obj.metadata?.company_id;
-            if (companyId) {
-              await pool.query(
-                `UPDATE companies SET stripe_customer_id=$2, subscription_id=$3 WHERE id=$1`,
-                [companyId, obj.customer ?? null, obj.subscription ?? null]);
-            }
-            break;
-          }
-          case 'customer.subscription.created':
-          case 'customer.subscription.updated':
-            await applySubscription(obj);
-            break;
-          case 'customer.subscription.deleted': {
-            const cid = await companyIdByCustomer(typeof obj.customer === 'string' ? obj.customer : obj.customer?.id)
-              ?? obj.metadata?.company_id;
-            if (cid) {
-              await pool.query(
-                `UPDATE companies SET plan='free', subscription_status='canceled',
-                   subscription_id=NULL, subscription_price_id=NULL,
-                   current_period_end=NULL, cancel_at_period_end=false WHERE id=$1`,
-                [cid]);
-            }
-            break;
-          }
-          case 'invoice.paid': {
-            const cid = await companyIdByCustomer(typeof obj.customer === 'string' ? obj.customer : obj.customer?.id);
-            if (cid) await pool.query(`UPDATE companies SET subscription_status='active' WHERE id=$1 AND subscription_status <> 'none'`, [cid]);
-            break;
-          }
-          case 'invoice.payment_failed': {
-            // Accès conservé pendant la relance Stripe ; la résiliation éventuelle
-            // arrive via customer.subscription.deleted → retour Gratuit.
-            const cid = await companyIdByCustomer(typeof obj.customer === 'string' ? obj.customer : obj.customer?.id);
-            if (cid) await pool.query(`UPDATE companies SET subscription_status='past_due' WHERE id=$1`, [cid]);
-            break;
-          }
-        }
+        await processStripeEvent(event, req.log);
       } catch (err) {
-        // Événement mal traité : Stripe réessaiera ; on laisse l'event_id
-        // consommé pour ne pas boucler indéfiniment sur une donnée invalide.
-        req.log.warn({ err, type: event.type }, 'stripe webhook handler failed');
+        // Événement mal traité : on laisse l'event_id consommé pour ne pas
+        // boucler indéfiniment sur une donnée invalide, mais l'échec est
+        // loggué en erreur avec l'event_id → rejeu manuel possible :
+        // `npm run stripe:replay -- <event_id>` (ou dist/replay-event.js).
+        req.log.error(
+          { err, eventId: event.id, type: event.type },
+          'échec de traitement du webhook Stripe — rejeu : replay-event.js <event_id>');
       }
       return { received: true };
     });

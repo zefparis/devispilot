@@ -57,6 +57,27 @@ export async function buildApp() {
     return reply.code(status).send({ error: status === 500 ? 'Erreur interne.' : err.message });
   });
 
+  // En-têtes de sécurité — sans dépendance. CSP restrictive : aucun script
+  // ni style inline (config.js/app.js externes, styles en classes CSS).
+  // S'applique à l'API et au front statique servi par l'API (auto-hébergé
+  // même origine) ; sur Vercel les mêmes en-têtes sont posés par vercel.json.
+  app.addHook('onSend', async (_req, reply) => {
+    reply.headers({
+      'content-security-policy': [
+        "default-src 'self'", "script-src 'self'", "style-src 'self'",
+        "img-src 'self' data: blob:", "font-src 'self'", "connect-src 'self'",
+        "object-src 'none'", "base-uri 'self'", "form-action 'self'",
+        "frame-ancestors 'none'",
+      ].join('; '),
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'x-frame-options': 'DENY',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+      // HSTS : ignoré en HTTP par les navigateurs, actif en HTTPS (tunnel).
+      'strict-transport-security': 'max-age=15552000; includeSubDomains',
+    });
+  });
+
   // CSRF : toute mutation /api exige l'en-tête applicatif, et l'Origin,
   // quand elle est présente, doit correspondre à l'hôte servi.
   app.addHook('onRequest', async (req, reply) => {

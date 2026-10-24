@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import { requireCompany } from '../guards.js';
 import { validateQuote, isDate } from '../validate.js';
-import { remainingQuoteQuota } from '../stripe.js';
+import { lockedRemainingQuota } from '../stripe.js';
 
 const ACTIVE = ['sent', 'replied'];
 const LIMIT_ERROR = {
@@ -21,9 +21,12 @@ const SELECT = `
 export default async function quoteRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireCompany);
 
-  // Liste avec recherche et filtres — toujours bornée à l'entreprise de la session.
+  // Liste avec recherche, filtres et pagination — toujours bornée à
+  // l'entreprise de la session. limit borné à 500, défaut 200.
   app.get('/api/quotes', async (req) => {
-    const { search = '', status = '', due = '' } = req.query as Record<string, string>;
+    const { search = '', status = '', due = '', limit = '', offset = '' } = req.query as Record<string, string>;
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 200, 1), 500);
+    const off = Math.max(parseInt(offset, 10) || 0, 0);
     const params: unknown[] = [req.companyId];
     let where = 'q.company_id = $1';
     if (status && ['sent', 'replied', 'won', 'lost'].includes(status)) {
@@ -34,7 +37,10 @@ export default async function quoteRoutes(app: FastifyInstance) {
       params.push(`%${search.toLowerCase()}%`);
       where += ` AND (lower(q.client) LIKE $${params.length} OR lower(q.project) LIKE $${params.length})`;
     }
-    const { rows } = await pool.query(`${SELECT} WHERE ${where} ORDER BY q.next ASC, q.created_at DESC`, params);
+    params.push(lim, off);
+    const { rows } = await pool.query(
+      `${SELECT} WHERE ${where} ORDER BY q.next ASC, q.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params);
     return { quotes: rows };
   });
 
@@ -42,38 +48,75 @@ export default async function quoteRoutes(app: FastifyInstance) {
     const v = validateQuote(req.body);
     if (!v.value) return reply.code(400).send({ error: v.error });
     const q = v.value;
-    // Limite Gratuit : 10 devis actifs. Appliquée côté serveur, jamais au seul front.
-    if (ACTIVE.includes(q.status) && (await remainingQuoteQuota(req.companyId!)) < 1)
-      return reply.code(403).send(LIMIT_ERROR);
-    const { rows } = await pool.query(
-      `INSERT INTO quotes (company_id, client, email, project, amount_cents, currency, sent, next, status, notes)
-       VALUES ($1,$2,$3,$4,$5,'EUR',$6,$7,$8,$9) RETURNING id`,
-      [req.companyId, q.client, q.email, q.project, q.amountCents, q.sent, q.next, q.status, q.notes],
-    );
-    return reply.code(201).send({ id: rows[0].id });
+    // Limite Gratuit : 10 devis actifs. Appliquée côté serveur dans la
+    // même transaction que l'INSERT (verrou FOR UPDATE sur l'entreprise)
+    // → deux créations concurrentes ne dépassent pas la limite.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (ACTIVE.includes(q.status) && (await lockedRemainingQuota(client, req.companyId!)) < 1) {
+        await client.query('ROLLBACK');
+        return reply.code(403).send(LIMIT_ERROR);
+      }
+      const { rows } = await client.query(
+        `INSERT INTO quotes (company_id, client, email, project, amount_cents, currency, sent, next, status, notes)
+         VALUES ($1,$2,$3,$4,$5,'EUR',$6,$7,$8,$9) RETURNING id`,
+        [req.companyId, q.client, q.email, q.project, q.amountCents, q.sent, q.next, q.status, q.notes],
+      );
+      await client.query('COMMIT');
+      return reply.code(201).send({ id: rows[0].id });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
   });
 
   app.patch('/api/quotes/:id', async (req, reply) => {
     const v = validateQuote(req.body);
     if (!v.value) return reply.code(400).send({ error: v.error });
     const q = v.value;
-    // Réactivation d'un devis signé/perdu : il reconsomme le quota Gratuit.
-    if (ACTIVE.includes(q.status)) {
-      const { rows: cur } = await pool.query(
-        'SELECT status FROM quotes WHERE id=$1 AND company_id=$2',
-        [(req.params as any).id, req.companyId]);
-      if (!cur.length) return reply.code(404).send({ error: 'Devis introuvable.' });
-      if (!ACTIVE.includes(cur[0].status) && (await remainingQuoteQuota(req.companyId!)) < 1)
-        return reply.code(403).send(LIMIT_ERROR);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Verrou d'entreprise acquis AVANT la lecture du statut courant :
+      // toutes les écritures qui changent un devis vers un statut actif
+      // se sérialisent ainsi (pas de double réactivation au-delà du quota).
+      const quotaLeft = ACTIVE.includes(q.status)
+        ? await lockedRemainingQuota(client, req.companyId!)
+        : Number.POSITIVE_INFINITY;
+      if (ACTIVE.includes(q.status)) {
+        const { rows: cur } = await client.query(
+          'SELECT status FROM quotes WHERE id=$1 AND company_id=$2',
+          [(req.params as any).id, req.companyId]);
+        if (!cur.length) {
+          await client.query('ROLLBACK');
+          return reply.code(404).send({ error: 'Devis introuvable.' });
+        }
+        if (!ACTIVE.includes(cur[0].status) && quotaLeft < 1) {
+          await client.query('ROLLBACK');
+          return reply.code(403).send(LIMIT_ERROR);
+        }
+      }
+      const { rowCount } = await client.query(
+        `UPDATE quotes SET client=$3, email=$4, project=$5, amount_cents=$6, sent=$7,
+                next=$8, status=$9, notes=$10, updated_at=now()
+         WHERE id=$1 AND company_id=$2`,
+        [(req.params as any).id, req.companyId, q.client, q.email, q.project, q.amountCents, q.sent, q.next, q.status, q.notes],
+      );
+      if (!rowCount) {
+        await client.query('ROLLBACK');
+        return reply.code(404).send({ error: 'Devis introuvable.' });
+      }
+      await client.query('COMMIT');
+      return { ok: true };
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
     }
-    const { rowCount } = await pool.query(
-      `UPDATE quotes SET client=$3, email=$4, project=$5, amount_cents=$6, sent=$7,
-              next=$8, status=$9, notes=$10, updated_at=now()
-       WHERE id=$1 AND company_id=$2`,
-      [(req.params as any).id, req.companyId, q.client, q.email, q.project, q.amountCents, q.sent, q.next, q.status, q.notes],
-    );
-    if (!rowCount) return reply.code(404).send({ error: 'Devis introuvable.' });
-    return { ok: true };
   });
 
   app.delete('/api/quotes/:id', async (req, reply) => {

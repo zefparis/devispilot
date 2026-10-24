@@ -4,8 +4,19 @@ import { requireCompany, requireSession } from '../guards.js';
 
 const SIREN_RE = /^\d{9}$|^\d{14}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const LOGO_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const LOGO_MAX_BYTES = 200 * 1024;
+
+// Signature réelle du fichier (magic bytes) : le type déclaré ne fait pas foi.
+// Renvoie le type MIME reconnu ou null — tout autre contenu est rejeté.
+function sniffImage(buf: Buffer): string | null {
+  if (buf.length >= 8 && buf.readUInt32BE(0) === 0x89504e47 && buf.readUInt32BE(4) === 0x0d0a1a0a)
+    return 'image/png';
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+    return 'image/jpeg';
+  if (buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP')
+    return 'image/webp';
+  return null;
+}
 
 export default async function profileRoutes(app: FastifyInstance) {
   // Nom affiché dans le compte (hors email — changé via /api/auth/change-email).
@@ -55,7 +66,9 @@ export default async function profileRoutes(app: FastifyInstance) {
     const buf = Buffer.from(m[2], 'base64');
     if (!buf.length || buf.length > LOGO_MAX_BYTES)
       return reply.code(400).send({ error: 'Logo trop lourd (200 Ko max).' });
-    if (!LOGO_MIMES.has(m[1])) return reply.code(400).send({ error: 'Type d’image non pris en charge.' });
+    // Le contenu doit être réellement une image et correspondre au type déclaré.
+    if (sniffImage(buf) !== m[1])
+      return reply.code(400).send({ error: 'Contenu invalide : image PNG, JPEG ou WebP attendue.' });
     await pool.query('UPDATE companies SET logo_data=$2, logo_mime=$3 WHERE id=$1', [req.companyId, buf, m[1]]);
     return { ok: true };
   });
