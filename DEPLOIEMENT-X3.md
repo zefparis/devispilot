@@ -174,9 +174,17 @@ rsync -a unipaycongo@192.168.1.166:devispilot/dumps/ ~/sauvegardes/devispilot/
 # ou : scp 'unipaycongo@192.168.1.166:devispilot/dumps/*.dump' ~/sauvegardes/devispilot/
 ```
 
-Pour une sauvegarde planifiée : cron sur X3, ex. `0 3 * * * /home/unipaycongo/devispilot/scripts/backup.sh`
-+ rétention (`find dumps -mtime +14 -delete`). À mettre en place explicitement —
-rien n'est configuré par défaut.
+Sauvegarde planifiée **en place sur X3** (crontab de `unipaycongo`, depuis le
+21/10/2026 — vérifier avec `crontab -l`) :
+
+```
+15 3 * * * cd /home/unipaycongo/devispilot && ./scripts/backup.sh >> dumps/backup.log 2>&1 \
+  && find dumps -name "devispilot-*.dump" -mtime +14 -delete
+```
+
+Quotidienne à 03:15, rétention 14 jours (`find -mtime +14 -delete` dans la même
+ligne). Le log est dans `dumps/backup.log`. Sans ce cron, rien ne tourne tout
+seul : la ligne ci-dessus est à recréer si le dépôt est réinstallé ailleurs.
 
 ## 5. Restauration (testée localement)
 
